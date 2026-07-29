@@ -96,7 +96,7 @@ export default function RegionPage() {
     <div className="min-h-screen bg-[#E8E8F0]">
       {/* Navigation */}
       <nav className="fixed top-0 left-0 right-0 z-50 bg-[#C8C8E0] border-b border-[#A8A8C8]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center gap-6">
               {user ? (
@@ -134,15 +134,15 @@ export default function RegionPage() {
             </div>
             <div className="flex items-center gap-6">
               <div className="hidden md:flex items-center gap-6">
-                <Link href="/explore" className="text-slate-800  hover:text-[#9370DB] transition-colors text-sm">
+                <Link href="/explore" className="text-slate-800 hover:text-[#9370DB] transition-colors text-sm">
                   Explore
                 </Link>
                 {!user ? (
                   <>
-                    <Link href="/login" className="text-slate-800  hover:text-[#9370DB] transition-colors text-sm">
+                    <Link href="/login" className="text-slate-800 hover:text-[#9370DB] transition-colors text-sm">
                       Login
-                    </Link>
-                    <Link href="/signup" className="text-slate-800  hover:text-[#9370DB] transition-colors text-sm">
+                </Link>
+                    <Link href="/signup" className="text-slate-800 hover:text-[#9370DB] transition-colors text-sm">
                       Sign Up
                     </Link>
                   </>

@@ -117,9 +117,6 @@ export default function Explore() {
         <div className="px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center gap-6">
-              <Link href="/explore" className="text-slate-800  hover:text-[#9370DB] transition-colors text-sm">
-                Explore
-              </Link>
               {user ? (
                 <div className="relative">
                   <button 
@@ -154,26 +151,34 @@ export default function Explore() {
               ) : null}
             </div>
             <div className="flex items-center gap-6">
-              {!user ? (
-                <>
-                  <Link href="/login" className="text-slate-800  hover:text-[#9370DB] transition-colors text-sm">
-                    Login
-                  </Link>
-                  <Link href="/signup" className="text-slate-800  hover:text-[#9370DB] transition-colors text-sm">
-                    Sign Up
-                  </Link>
-                </>
-              ) : null}
+              <div className="hidden md:flex items-center gap-6">
+                <Link href="/explore" className="text-slate-800 hover:text-[#9370DB] transition-colors text-sm">
+                  Explore
+                </Link>
+                <Link href="/chat" className="text-slate-800 hover:text-[#9370DB] transition-colors text-sm">
+                  Chat
+                </Link>
+                {!user ? (
+                  <>
+                    <Link href="/login" className="text-slate-800 hover:text-[#9370DB] transition-colors text-sm">
+                      Login
+                    </Link>
+                    <Link href="/signup" className="text-slate-800 hover:text-[#9370DB] transition-colors text-sm">
+                      Sign Up
+                    </Link>
+                  </>
+                ) : null}
+              </div>
             </div>
           </div>
         </div>
       </nav>
 
       {/* Explore Section */}
-      <section className="pt-16 h-screen">
+      <section className="pt-16 h-screen overflow-hidden">
         <div className="flex gap-8 h-full">
           {/* Left side - Regions with nested Provinces */}
-          <div className="w-64 bg-[#C8C8E0] p-4 h-full">
+          <div className="w-64 bg-[#C8C8E0] p-4 h-full overflow-y-auto">
             <div className="space-y-2">
               {Object.keys(regionData).map((region) => {
                 const provinces = new Set(regionData[region]?.map(uni => uni.province) || []);
@@ -224,7 +229,7 @@ export default function Explore() {
           </div>
 
           {/* Right side - Universities */}
-          <div className="flex-1 relative">
+          <div className="flex-1 relative overflow-hidden">
             {/* Background Carousel */}
             <div className="absolute inset-0 -left-8 -right-8 -top-8 -bottom-8 overflow-hidden pointer-events-none z-0">
               {getFilteredUniversities().map((uni, index) => (
@@ -243,7 +248,7 @@ export default function Explore() {
               ))}
             </div>
             
-            <div className={`relative z-10 space-y-3 transition-opacity duration-300 p-8 ${isAnimating ? 'opacity-0' : 'opacity-100'}`}>
+            <div className={`relative z-10 space-y-3 transition-opacity duration-300 p-8 h-full overflow-y-auto ${isAnimating ? 'opacity-0' : 'opacity-100'}`}>
               {getFilteredUniversities().map((uni, index) => (
                 <div
                   key={index}

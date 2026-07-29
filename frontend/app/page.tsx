@@ -90,6 +90,9 @@ export default function Home() {
                 <Link href="/explore" className="text-slate-800  hover:text-[#9370DB] transition-colors text-sm">
                   Explore
                 </Link>
+                <Link href="/chat" className="text-slate-800  hover:text-[#9370DB] transition-colors text-sm">
+                  Chat
+                </Link>
                 {!user ? (
                   <>
                     <Link href="/login" className="text-slate-800  hover:text-[#9370DB] transition-colors text-sm">

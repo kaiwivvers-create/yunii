@@ -975,6 +975,7 @@ export default function UniversityPage() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [university, setUniversity] = useState<any>(null);
   const [activeSection, setActiveSection] = useState('overview');
+  const [expandedCourse, setExpandedCourse] = useState<string | null>(null);
 
   useEffect(() => {
     // Check if user is logged in
@@ -1003,6 +1004,10 @@ export default function UniversityPage() {
     }
   };
 
+  const toggleCourse = (course: string) => {
+    setExpandedCourse(expandedCourse === course ? null : course);
+  };
+
   if (!university) {
     return (
       <div className="min-h-screen bg-[#E8E8F0] flex items-center justify-center">
@@ -1020,7 +1025,7 @@ export default function UniversityPage() {
     <div className="min-h-screen bg-[#E8E8F0]">
       {/* Navigation */}
       <nav className="fixed top-0 left-0 right-0 z-50 bg-[#C8C8E0] border-b border-[#A8A8C8]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center gap-6">
               {user ? (
@@ -1061,6 +1066,9 @@ export default function UniversityPage() {
                 <Link href="/explore" className="text-slate-800 hover:text-[#9370DB] transition-colors text-sm">
                   Explore
                 </Link>
+                <Link href="/chat" className="text-slate-800 hover:text-[#9370DB] transition-colors text-sm">
+                  Chat
+                </Link>
                 {!user ? (
                   <>
                     <Link href="/login" className="text-slate-800 hover:text-[#9370DB] transition-colors text-sm">
@@ -1082,12 +1090,6 @@ export default function UniversityPage() {
         <div className="flex gap-8 h-full">
           {/* Left side - Sidebar Navigation */}
           <div className="w-64 bg-[#C8C8E0] p-4 h-full">
-            <div className="mb-6">
-              <Link href="/explore" className="text-[#9370DB] hover:underline text-sm">
-                ← Back to Explore
-              </Link>
-            </div>
-            
             <div className="space-y-2">
               <button
                 onClick={() => scrollToSection('overview')}
@@ -1165,15 +1167,15 @@ export default function UniversityPage() {
           {/* Right side - Content */}
           <div className="flex-1 overflow-y-auto p-8">
             <div id="overview" className="mb-12">
+              <img 
+                src={university.image} 
+                alt={university.name}
+                className="w-full h-96 object-cover rounded-lg mb-6"
+              />
               <div className="bg-[#C8C8E0] border border-[#A8A8C8] rounded-lg p-8">
-                <img 
-                  src={university.image} 
-                  alt={university.name}
-                  className="w-full h-64 object-cover rounded-lg mb-6"
-                />
-                <h1 className="text-3xl font-bold text-slate-900 mb-2">{university.name}</h1>
-                <p className="text-slate-800 mb-4">{university.location}</p>
-                <p className="text-slate-800">{university.description}</p>
+                <h1 className="text-5xl font-bold text-slate-900 mb-3 font-serif">{university.name}</h1>
+                <p className="text-2xl text-slate-800 mb-4 font-light">{university.location}</p>
+                <p className="text-xl text-slate-800 font-light">{university.description}</p>
               </div>
             </div>
 
@@ -1194,10 +1196,21 @@ export default function UniversityPage() {
             <div id="courses" className="mb-12">
               <div className="bg-[#C8C8E0] border border-[#A8A8C8] rounded-lg p-8">
                 <h2 className="text-2xl font-bold text-slate-900 mb-4">Courses</h2>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
                   {university.courses.map((course: string, index: number) => (
-                    <div key={index} className="bg-[#E8E8F0] border border-[#A8A8C8] rounded-lg p-3">
-                      <p className="text-slate-800">{course}</p>
+                    <div key={index}>
+                      <button 
+                        onClick={() => toggleCourse(course)}
+                        className="w-full bg-[#E8E8F0] border border-[#A8A8C8] rounded-lg p-3 hover:border-[#9370DB] hover:bg-[#D8D8E8] transition-colors cursor-pointer text-left flex justify-between items-center"
+                      >
+                        <p className="text-slate-800">{course}</p>
+                        <span className="text-slate-800 text-xs">{expandedCourse === course ? '▲' : '▼'}</span>
+                      </button>
+                      {expandedCourse === course && (
+                        <div className="ml-4 mt-2 p-3 bg-[#D8D8E8] rounded-lg animate-fade-in-down">
+                          <p className="text-slate-800 text-sm">Course details for {course}</p>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
