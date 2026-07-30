@@ -240,12 +240,18 @@ export default function Home() {
             Join millions of students who found their perfect university through UniVerse
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <button className="px-6 py-3 bg-[#9370DB] text-white rounded font-medium hover:bg-[#7B68EE] transition-colors">
-              Create Free Account
-            </button>
-            <button className="px-6 py-3 border border-slate-300  text-slate-900  rounded font-medium hover:bg-slate-50  transition-colors">
-              Explore Universities
-            </button>
+            {!user && (
+              <Link href="/signup">
+                <button className="px-6 py-3 bg-[#9370DB] text-white rounded font-medium hover:bg-[#7B68EE] transition-colors">
+                  Create Free Account
+                </button>
+              </Link>
+            )}
+            <Link href="/explore">
+              <button className="px-6 py-3 border border-slate-300  text-slate-900  rounded font-medium hover:bg-slate-50  transition-colors">
+                Explore Universities
+              </button>
+            </Link>
           </div>
         </div>
       </section>

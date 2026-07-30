@@ -43,7 +43,6 @@ export default function Explore() {
   const [selectedRegion, setSelectedRegion] = useState<string>('North America');
   const [selectedProvince, setSelectedProvince] = useState<string>('All');
   const [selectedUni, setSelectedUni] = useState<any>(null);
-  const [modalOpen, setModalOpen] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
   const [expandedRegion, setExpandedRegion] = useState<string | null>('North America');
   const [currentBgIndex, setCurrentBgIndex] = useState(0);
@@ -75,7 +74,6 @@ export default function Explore() {
 
   const handleUniClick = (uni: any) => {
     setSelectedUni(uni);
-    setModalOpen(true);
   };
 
   const handleRegionChange = (region: string) => {
@@ -176,7 +174,7 @@ export default function Explore() {
 
       {/* Explore Section */}
       <section className="pt-16 h-screen overflow-hidden">
-        <div className="flex gap-8 h-full">
+        <div className="flex h-full gap-0">
           {/* Left side - Regions with nested Provinces */}
           <div className="w-64 bg-[#C8C8E0] p-4 h-full overflow-y-auto">
             <div className="space-y-2">
@@ -231,7 +229,7 @@ export default function Explore() {
           {/* Right side - Universities */}
           <div className="flex-1 relative overflow-hidden">
             {/* Background Carousel */}
-            <div className="absolute inset-0 -left-8 -right-8 -top-8 -bottom-8 overflow-hidden pointer-events-none z-0">
+            <div className="absolute inset-0 overflow-hidden pointer-events-none z-0" style={{ left: '-256px', right: '0' }}>
               {getFilteredUniversities().map((uni, index) => (
                 <div
                   key={index}
@@ -253,7 +251,9 @@ export default function Explore() {
                 <div
                   key={index}
                   onClick={() => handleUniClick(uni)}
-                  className="bg-[#C8C8E0] border border-[#A8A8C8] rounded-lg p-4 hover:border-[#9370DB] transition-colors cursor-pointer"
+                  className={`bg-[#C8C8E0] border rounded-lg p-4 transition-colors cursor-pointer ${
+                    selectedUni?.id === uni.name ? 'border-[#9370DB] bg-[#D8D8E8]' : 'border-[#A8A8C8] hover:border-[#9370DB]'
+                  }`}
                 >
                   <h3 className="font-semibold text-slate-900 mb-1">{uni.name}</h3>
                   <p className="text-sm text-slate-800">{uni.location}</p>
@@ -261,39 +261,39 @@ export default function Explore() {
               ))}
             </div>
           </div>
-        </div>
-      </section>
 
-      {/* Modal */}
-      {modalOpen && selectedUni && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-[#C8C8E0] border border-[#A8A8C8] rounded-lg p-6 max-w-2xl w-full animate-fade-in-down">
-            <img 
-              src={selectedUni.image} 
-              alt={selectedUni.name}
-              className="w-full h-64 object-cover rounded-lg mb-4"
-            />
-            <h2 className="text-2xl font-bold text-slate-900 mb-2">{selectedUni.name}</h2>
-            <p className="text-slate-800 mb-4">{selectedUni.location}</p>
-            <p className="text-slate-800 mb-6">{selectedUni.description}</p>
-            <div className="flex gap-3">
+          {/* Right Side Panel */}
+          {selectedUni && (
+            <div className="w-96 bg-[#C8C8E0] border-l border-[#A8A8C8] p-6 overflow-y-auto animate-fade-in-right">
               <button
-                onClick={() => setModalOpen(false)}
-                className="px-4 py-2 border border-[#A8A8C8] text-slate-900 rounded hover:bg-[#A8A8C8] transition-colors"
+                onClick={() => setSelectedUni(null)}
+                className="mb-4 text-slate-800 hover:text-[#9370DB] transition-colors flex items-center gap-2"
               >
-                Close
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+                Back
               </button>
+              <div className="w-full h-64 bg-white rounded-lg mb-4 flex items-center justify-center overflow-hidden">
+                <img 
+                  src={selectedUni.image} 
+                  alt={selectedUni.name}
+                  className="w-full h-full object-contain"
+                />
+              </div>
+              <h2 className="text-2xl font-bold text-slate-900 mb-2">{selectedUni.name}</h2>
+              <p className="text-slate-800 mb-4">{selectedUni.location}</p>
+              <p className="text-slate-800 mb-6">{selectedUni.description}</p>
               <Link
                 href={`/university/${selectedUni.name.toLowerCase().replace(/\s+/g, '-')}`}
-                className="px-4 py-2 bg-[#9370DB] text-white rounded hover:bg-[#7B68EE] transition-colors"
-                onClick={() => setModalOpen(false)}
+                className="block w-full px-4 py-2 bg-[#9370DB] text-white rounded hover:bg-[#7B68EE] transition-colors text-center"
               >
                 See More
               </Link>
             </div>
-          </div>
+          )}
         </div>
-      )}
+      </section>
     </div>
   );
 }

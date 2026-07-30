@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
 interface Chat {
   id: string;
@@ -55,15 +56,25 @@ export default function ChatPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [randomPrompt, setRandomPrompt] = useState<string | null>(null);
   const [waitingForPasscode, setWaitingForPasscode] = useState(false);
+  const [user, setUser] = useState<any>(null);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const currentChat = chats.find(c => c.id === currentChatId);
   const isSecretMode = currentChatId && secretModeChats.has(currentChatId);
+
+  // Filter chats based on search query
+  const filteredChats = chats.filter(chat => 
+    chat.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    chat.messages.some(msg => msg.content.toLowerCase().includes(searchQuery.toLowerCase()))
+  );
 
   // Load data from localStorage after mount
   useEffect(() => {
     const savedChats = localStorage.getItem('chats');
     const savedCurrentChatId = localStorage.getItem('currentChatId');
     const savedSecretModeChats = localStorage.getItem('secretModeChats');
+    const storedUser = localStorage.getItem('user');
     
     if (savedChats) {
       setChats(JSON.parse(savedChats));
@@ -73,6 +84,9 @@ export default function ChatPage() {
     }
     if (savedSecretModeChats) {
       setSecretModeChats(new Set(JSON.parse(savedSecretModeChats)));
+    }
+    if (storedUser) {
+      setUser(JSON.parse(storedUser));
     }
   }, []);
 
@@ -268,8 +282,15 @@ export default function ChatPage() {
     }
   };
 
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    setUser(null);
+    setDropdownOpen(false);
+  };
+
   return (
-    <div className="h-screen bg-[#E8E8F0] overflow-hidden relative flex flex-col">
+    <div className="h-screen bg-[#E8E8F0] overflow-hidden relative flex flex-col pt-16">
       {/* 3D Geometric Background */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-20 left-20 w-32 h-32 bg-[#9370DB]/20 rounded-lg animate-float-1 transform rotate-12"></div>
@@ -305,24 +326,78 @@ export default function ChatPage() {
       </div>
 
       {/* Navigation */}
-      <nav className="bg-[#9370DB] text-white p-4 flex items-center justify-between relative z-10 flex-shrink-0">
-        <div className="flex items-center gap-4">
-          <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="p-2 hover:bg-[#7B68EE] rounded-lg transition-colors"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-          </button>
-          <h1 className="text-xl font-bold">UniVerse Chat</h1>
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-[#C8C8E0] border-b border-[#A8A8C8] flex-shrink-0">
+        <div className="px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            <div className="flex items-center gap-6">
+              <button
+                onClick={() => setSidebarOpen(!sidebarOpen)}
+                className="p-2 hover:bg-[#A8A8C8] rounded-lg transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              </button>
+              {user ? (
+                <div className="relative">
+                  <button 
+                    onClick={() => setDropdownOpen(!dropdownOpen)}
+                    className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
+                  >
+                    <div className="w-8 h-8 rounded-full bg-[#9370DB] flex items-center justify-center text-white text-sm font-medium">
+                      {user.name ? user.name.charAt(0).toUpperCase() : user.email.charAt(0).toUpperCase()}
+                    </div>
+                    <span className="text-slate-800 text-sm">Welcome, {user.name || user.email}</span>
+                    <span className="text-slate-800 hover:text-[#9370DB] transition-colors text-xs ml-2 transform transition-transform duration-200">
+                      {dropdownOpen ? '▲' : '▼'}
+                    </span>
+                  </button>
+                  {dropdownOpen && (
+                    <div className="absolute top-full left-0 mt-2 bg-[#C8C8E0] border border-[#A8A8C8] rounded-lg shadow-lg py-2 w-48 z-50 animate-fade-in-down">
+                      <button className="w-full text-left px-4 py-2 text-slate-800 hover:bg-[#A8A8C8] transition-colors text-sm">
+                        My Profile
+                      </button>
+                      <button className="w-full text-left px-4 py-2 text-slate-800 hover:bg-[#A8A8C8] transition-colors text-sm">
+                        Settings
+                      </button>
+                      <button 
+                        onClick={handleLogout}
+                        className="w-full text-left px-4 py-2 text-[#ff6b6b] hover:bg-[#ffe2e2] transition-colors text-sm"
+                      >
+                        Logout
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : null}
+            </div>
+            <div className="flex items-center gap-6">
+              <div className="hidden md:flex items-center gap-6">
+                <Link href="/explore" className="text-slate-800 hover:text-[#9370DB] transition-colors text-sm">
+                  Explore
+                </Link>
+                <Link href="/chat" className="text-slate-800 hover:text-[#9370DB] transition-colors text-sm">
+                  Chat
+                </Link>
+                {!user ? (
+                  <>
+                    <Link href="/login" className="text-slate-800 hover:text-[#9370DB] transition-colors text-sm">
+                      Login
+                    </Link>
+                    <Link href="/signup" className="text-slate-800 hover:text-[#9370DB] transition-colors text-sm">
+                      Sign Up
+                    </Link>
+                  </>
+                ) : null}
+              </div>
+              {!user && (
+                <Link href="/signup" className="px-4 py-2 bg-[#9370DB] text-white rounded text-sm font-medium hover:bg-[#7B68EE] transition-colors">
+                  Get Started
+                </Link>
+              )}
+            </div>
+          </div>
         </div>
-        <button
-          onClick={() => router.push('/')}
-          className="px-4 py-2 bg-[#7B68EE] rounded-lg hover:bg-[#6A5ACD] transition-colors"
-        >
-          Back to Home
-        </button>
       </nav>
 
       <div className="flex flex-1 overflow-hidden relative z-10">
@@ -338,8 +413,18 @@ export default function ChatPage() {
               </svg>
               New Chat
             </button>
+            {/* Search Input */}
+            <div className="mb-4">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search chats..."
+                className="w-full px-3 py-2 bg-[#E8E8F0] border border-[#A8A8C8] rounded-lg text-slate-800 placeholder-slate-500 text-sm focus:outline-none focus:border-[#9370DB]"
+              />
+            </div>
             <div className="flex-1 overflow-y-auto space-y-2">
-              {chats.map(chat => (
+              {filteredChats.map(chat => (
                 <div
                   key={chat.id}
                   className={`p-3 rounded-lg cursor-pointer transition-colors ${
