@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(request: NextRequest) {
   try {
-    const { message, history, isNewChat, secretMode } = await request.json();
+    const { message, history, isNewChat, secretMode, context } = await request.json();
 
     // Google Gemini API endpoint
     const apiKey = process.env.GEMINI_API_KEY;
@@ -14,10 +14,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Adjust system prompt based on secret mode
-    const systemPrompt = secretMode 
-      ? `You are a helpful AI assistant. You can answer questions about any topic - universities, general knowledge, personal advice, or anything else the user asks. Be helpful, conversational, and provide thoughtful responses.`
-      : `You are a helpful university assistant. You ONLY answer questions related to:
+    // Build system prompt with context
+    let systemPrompt = secretMode 
+      ? `You are Cae, a helpful AI assistant for UniVerse, a university discovery platform that helps students find and explore universities worldwide. You can answer questions about any topic - universities, general knowledge, personal advice, or anything else the user asks. Be helpful, conversational, and provide thoughtful responses.`
+      : `You are Cae, a helpful university assistant for UniVerse, a university discovery platform that helps students find and explore universities worldwide. You answer questions related to:
 - Universities and colleges
 - Courses and academic programs
 - Admissions and applications
@@ -27,6 +27,11 @@ export async function POST(request: NextRequest) {
 - The UniVerse app features and navigation
 
 If a user asks about anything outside these topics (medical advice, legal advice, general knowledge, etc.), politely decline and redirect them to appropriate resources. Keep responses concise and helpful.`;
+
+    // Add context to system prompt if provided
+    if (context) {
+      systemPrompt += `\n\nContext about the current situation:\n${context}\n\nUse this context to provide relevant answers based on the user's current page and preferences.`;
+    }
 
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${apiKey}`,

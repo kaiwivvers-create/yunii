@@ -71,10 +71,10 @@ export default function Home() {
                       <button className="w-full text-left px-4 py-2 text-slate-800 hover:bg-[#A8A8C8] transition-colors text-sm">
                         My Profile
                       </button>
-                      <button className="w-full text-left px-4 py-2 text-slate-800 hover:bg-[#A8A8C8] transition-colors text-sm">
+                      <a href="/settings" className="block w-full text-left px-4 py-2 text-slate-800 hover:bg-[#A8A8C8] transition-colors text-sm">
                         Settings
-                      </button>
-                      <button 
+                      </a>
+                      <button
                         onClick={handleLogout}
                         className="w-full text-left px-4 py-2 text-[#ff6b6b] hover:bg-[#ffe2e2] transition-colors text-sm"
                       >

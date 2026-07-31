@@ -35,7 +35,7 @@ export default function Signup() {
         const data = await response.json();
         localStorage.setItem('token', data.access_token);
         localStorage.setItem('user', JSON.stringify(data.user));
-        router.push('/');
+        router.push('/survey');
       } else {
         alert('Signup failed');
       }

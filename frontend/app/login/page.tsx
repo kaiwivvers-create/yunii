@@ -27,7 +27,13 @@ export default function Login() {
         const data = await response.json();
         localStorage.setItem('token', data.access_token);
         localStorage.setItem('user', JSON.stringify(data.user));
-        router.push('/');
+        
+        const surveyCompleted = localStorage.getItem('surveyCompleted');
+        if (surveyCompleted !== 'true') {
+          router.push('/survey');
+        } else {
+          router.push('/');
+        }
       } else {
         alert('Login failed');
       }
