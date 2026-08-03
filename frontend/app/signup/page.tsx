@@ -34,8 +34,22 @@ export default function Signup() {
 
       if (response.ok) {
         const data = await response.json();
+        
+        // Load preserved profile data from userProfileData if it exists
+        const preservedProfile = localStorage.getItem('userProfileData');
+        const mergedUser = {
+          ...data.user,
+          // Use preserved profile data if it exists
+          profilePicture: preservedProfile ? JSON.parse(preservedProfile).profilePicture : data.user.profilePicture,
+          name: preservedProfile ? JSON.parse(preservedProfile).name : data.user.name,
+        };
+        
         localStorage.setItem('token', data.access_token);
-        localStorage.setItem('user', JSON.stringify(data.user));
+        localStorage.setItem('user', JSON.stringify(mergedUser));
+        
+        // Dispatch event to notify components of user update
+        window.dispatchEvent(new Event('userLogin'));
+        
         router.push('/survey');
       } else {
         alert('Signup failed');

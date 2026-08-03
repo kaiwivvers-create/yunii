@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Navbar from '@/components/Navbar';
+import SurveyOverlay from '@/components/SurveyOverlay';
 
 const universities = [
   { name: 'Harvard University', location: 'Cambridge, USA', image: 'https://images.unsplash.com/photo-1562774053-701939374585?w=1200&h=800&fit=crop' },
@@ -22,6 +23,8 @@ export default function Home() {
   const [currentUni, setCurrentUni] = useState(0);
   const [user, setUser] = useState<any>(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [showSurvey, setShowSurvey] = useState(false);
+  const [isBlurred, setIsBlurred] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -36,6 +39,20 @@ export default function Home() {
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
       setUser(JSON.parse(storedUser));
+      
+      // Check if survey needs to be shown (for non-admin users)
+      const surveyCompleted = localStorage.getItem('surveyCompleted');
+      const parsedUser = JSON.parse(storedUser);
+      
+      if (surveyCompleted !== 'true' && parsedUser.role !== 'admin') {
+        // Show landing page first, then blur and show survey
+        setTimeout(() => {
+          setIsBlurred(true);
+          setTimeout(() => {
+            setShowSurvey(true);
+          }, 500);
+        }, 1500);
+      }
     }
   }, []);
 
@@ -47,11 +64,11 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-[#E8E8F0] ">
+    <div className="min-h-screen bg-[#E8E8F0] relative">
       <Navbar currentPage="home" />
 
       {/* Background Carousel */}
-      <div className="absolute top-16 left-0 right-0 h-[650px] overflow-hidden pointer-events-none z-0">
+      <div className={`absolute top-16 left-0 right-0 h-[650px] overflow-hidden pointer-events-none z-0 transition-all duration-500 ${isBlurred ? 'blur-md scale-105' : ''}`}>
         {universities.map((uni, index) => (
           <div
             key={index}
@@ -71,8 +88,23 @@ export default function Home() {
         ))}
       </div>
 
+      {/* Survey Overlay */}
+      {showSurvey && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
+          <div className="bg-[#C8C8E0] dark:bg-dark-bg-secondary border border-[#A8A8C8] dark:border-dark-border rounded-lg p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto animate-scale-in">
+            <h1 className="text-3xl font-bold text-slate-900 dark:text-dark-text mb-2">Tell us about yourself</h1>
+            <p className="text-slate-800 dark:text-dark-text-secondary mb-6">This helps us find the best universities for you</p>
+            
+            <SurveyOverlay onClose={() => {
+              setShowSurvey(false);
+              setIsBlurred(false);
+            }} />
+          </div>
+        </div>
+      )}
+
       {/* Hero Section */}
-      <section className="pt-32 pb-16 px-4 sm:px-6 lg:px-8 relative z-10">
+      <section className={`pt-32 pb-16 px-4 sm:px-6 lg:px-8 relative z-10 transition-all duration-500 ${isBlurred ? 'opacity-50 pointer-events-none' : ''}`}>
         <div className="text-center">
           <h1 className="text-4xl sm:text-5xl font-bold text-slate-900  mb-6">
             Find Your Perfect University

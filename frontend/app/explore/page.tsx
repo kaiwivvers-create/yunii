@@ -3,43 +3,44 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
-const regionData: Record<string, { name: string; location: string; description: string; province: string; image: string }[]> = {
+const regionData: Record<string, { id: number; name: string; location: string; description: string; province: string; image: string }[]> = {
   'North America': [
-    { name: 'Harvard University', location: 'Cambridge, USA', description: 'Ivy League research university', province: 'Massachusetts', image: 'https://images.unsplash.com/photo-1562774053-701939374585?w=800&h=600&fit=crop' },
-    { name: 'MIT', location: 'Cambridge, USA', description: 'Leading technology and engineering school', province: 'Massachusetts', image: 'https://images.unsplash.com/photo-1564981797816-1043664bf78d?w=800&h=600&fit=crop' },
-    { name: 'Stanford University', location: 'Stanford, USA', description: 'Silicon Valley research university', province: 'California', image: 'https://images.unsplash.com/photo-1571269259264-5ccb2e888cbe?w=800&h=600&fit=crop' },
-    { name: 'Yale University', location: 'New Haven, USA', description: 'Ivy League liberal arts college', province: 'Connecticut', image: 'https://images.unsplash.com/photo-1541339907198-e08756dedf3f?w=800&h=600&fit=crop' },
+    { id: 1, name: 'Harvard University', location: 'Cambridge, USA', description: 'Ivy League research university', province: 'Massachusetts', image: 'https://images.unsplash.com/photo-1562774053-701939374585?w=800&h=600&fit=crop' },
+    { id: 2, name: 'MIT', location: 'Cambridge, USA', description: 'Leading technology and engineering school', province: 'Massachusetts', image: 'https://images.unsplash.com/photo-1564981797816-1043664bf78d?w=800&h=600&fit=crop' },
+    { id: 3, name: 'Stanford University', location: 'Stanford, USA', description: 'Silicon Valley research university', province: 'California', image: 'https://images.unsplash.com/photo-1571269259264-5ccb2e888cbe?w=800&h=600&fit=crop' },
+    { id: 4, name: 'Yale University', location: 'New Haven, USA', description: 'Ivy League liberal arts college', province: 'Connecticut', image: 'https://images.unsplash.com/photo-1541339907198-e08756dedf3f?w=800&h=600&fit=crop' },
   ],
   'Europe': [
-    { name: 'University of Oxford', location: 'Oxford, UK', description: 'Oldest English-speaking university', province: 'England', image: 'https://images.unsplash.com/photo-1580537659466-0a9bfa916a54?w=800&h=600&fit=crop' },
-    { name: 'University of Cambridge', location: 'Cambridge, UK', description: 'Historic research university', province: 'England', image: 'https://images.unsplash.com/photo-1592500565497-991d3e2e5f9a?w=800&h=600&fit=crop' },
-    { name: 'ETH Zurich', location: 'Zurich, Switzerland', description: 'Leading technical university', province: 'Zurich', image: 'https://images.unsplash.com/photo-1555861496-0666c8981751?w=800&h=600&fit=crop' },
-    { name: 'Imperial College London', location: 'London, UK', description: 'Science-based institution', province: 'England', image: 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=800&h=600&fit=crop' },
+    { id: 5, name: 'University of Oxford', location: 'Oxford, UK', description: 'Oldest English-speaking university', province: 'England', image: 'https://images.unsplash.com/photo-1580537659466-0a9bfa916a54?w=800&h=600&fit=crop' },
+    { id: 6, name: 'University of Cambridge', location: 'Cambridge, UK', description: 'Historic research university', province: 'England', image: 'https://images.unsplash.com/photo-1592500565497-991d3e2e5f9a?w=800&h=600&fit=crop' },
+    { id: 7, name: 'ETH Zurich', location: 'Zurich, Switzerland', description: 'Leading technical university', province: 'Zurich', image: 'https://images.unsplash.com/photo-1555861496-0666c8981751?w=800&h=600&fit=crop' },
+    { id: 8, name: 'Imperial College London', location: 'London, UK', description: 'Science-based institution', province: 'England', image: 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=800&h=600&fit=crop' },
   ],
   'Asia': [
-    { name: 'National University of Singapore', location: 'Singapore', description: 'Leading Asian university', province: 'Singapore', image: 'https://images.unsplash.com/photo-1525635313341-29744db9f37d?w=800&h=600&fit=crop' },
-    { name: 'Tsinghua University', location: 'Beijing, China', description: 'Leading Chinese university', province: 'Beijing', image: 'https://images.unsplash.com/photo-1509062522246-3755977927d7?w=800&h=600&fit=crop' },
-    { name: 'University of Tokyo', location: 'Tokyo, Japan', description: 'Japan\'s top university', province: 'Tokyo', image: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&h=600&fit=crop' },
-    { name: 'Peking University', location: 'Beijing, China', description: 'Historic Chinese university', province: 'Beijing', image: 'https://images.unsplash.com/photo-1577896851231-70ef18881754?w=800&h=600&fit=crop' },
+    { id: 9, name: 'National University of Singapore', location: 'Singapore', description: 'Leading Asian university', province: 'Singapore', image: 'https://images.unsplash.com/photo-1525635313341-29744db9f37d?w=800&h=600&fit=crop' },
+    { id: 10, name: 'Tsinghua University', location: 'Beijing, China', description: 'Leading Chinese university', province: 'Beijing', image: 'https://images.unsplash.com/photo-1509062522246-3755977927d7?w=800&h=600&fit=crop' },
+    { id: 11, name: 'University of Tokyo', location: 'Tokyo, Japan', description: 'Japan\'s top university', province: 'Tokyo', image: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&h=600&fit=crop' },
+    { id: 12, name: 'Peking University', location: 'Beijing, China', description: 'Historic Chinese university', province: 'Beijing', image: 'https://images.unsplash.com/photo-1577896851231-70ef18881754?w=800&h=600&fit=crop' },
   ],
   'Oceania': [
-    { name: 'Australian National University', location: 'Canberra, Australia', description: 'National research university', province: 'Australian Capital Territory', image: 'https://images.unsplash.com/photo-1555861496-0666c8981751?w=800&h=600&fit=crop' },
-    { name: 'University of Melbourne', location: 'Melbourne, Australia', description: 'Australia\'s top university', province: 'Victoria', image: 'https://images.unsplash.com/photo-1577896851231-70ef18881754?w=800&h=600&fit=crop' },
-    { name: 'University of Sydney', location: 'Sydney, Australia', description: 'Leading Australian university', province: 'New South Wales', image: 'https://images.unsplash.com/photo-1555861496-0666c8981751?w=800&h=600&fit=crop' },
+    { id: 13, name: 'Australian National University', location: 'Canberra, Australia', description: 'National research university', province: 'Australian Capital Territory', image: 'https://images.unsplash.com/photo-1555861496-0666c8981751?w=800&h=600&fit=crop' },
+    { id: 14, name: 'University of Melbourne', location: 'Melbourne, Australia', description: 'Australia\'s top university', province: 'Victoria', image: 'https://images.unsplash.com/photo-1577896851231-70ef18881754?w=800&h=600&fit=crop' },
+    { id: 15, name: 'University of Sydney', location: 'Sydney, Australia', description: 'Leading Australian university', province: 'New South Wales', image: 'https://images.unsplash.com/photo-1555861496-0666c8981751?w=800&h=600&fit=crop' },
   ],
   'South America': [
-    { name: 'University of São Paulo', location: 'São Paulo, Brazil', description: 'Brazil\'s largest university', province: 'São Paulo', image: 'https://images.unsplash.com/photo-1483729558449-99ef09a8c325?w=800&h=600&fit=crop' },
-    { name: 'University of Buenos Aires', location: 'Buenos Aires, Argentina', description: 'Argentina\'s top university', province: 'Buenos Aires', image: 'https://images.unsplash.com/photo-1518391846015-55a9cc003b25?w=800&h=600&fit=crop' },
+    { id: 16, name: 'University of São Paulo', location: 'São Paulo, Brazil', description: 'Brazil\'s largest university', province: 'São Paulo', image: 'https://images.unsplash.com/photo-1483729558449-99ef09a8c325?w=800&h=600&fit=crop' },
+    { id: 17, name: 'University of Buenos Aires', location: 'Buenos Aires, Argentina', description: 'Argentina\'s top university', province: 'Buenos Aires', image: 'https://images.unsplash.com/photo-1518391846015-55a9cc003b25?w=800&h=600&fit=crop' },
   ],
   'Africa': [
-    { name: 'University of Cape Town', location: 'Cape Town, South Africa', description: 'Africa\'s leading university', province: 'Western Cape', image: 'https://images.unsplash.com/photo-1580060839134-75a5edca2e99?w=800&h=600&fit=crop' },
-    { name: 'Stellenbosch University', location: 'Stellenbosch, South Africa', description: 'Top South African university', province: 'Western Cape', image: 'https://images.unsplash.com/photo-1580060839134-75a5edca2e99?w=800&h=600&fit=crop' },
+    { id: 18, name: 'University of Cape Town', location: 'Cape Town, South Africa', description: 'Africa\'s leading university', province: 'Western Cape', image: 'https://images.unsplash.com/photo-1580060839134-75a5edca2e99?w=800&h=600&fit=crop' },
+    { id: 19, name: 'Stellenbosch University', location: 'Stellenbosch, South Africa', description: 'Top South African university', province: 'Western Cape', image: 'https://images.unsplash.com/photo-1580060839134-75a5edca2e99?w=800&h=600&fit=crop' },
   ],
 };
 
 export default function Explore() {
   const [user, setUser] = useState<any>(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [adminDropdownOpen, setAdminDropdownOpen] = useState(false);
   const [selectedRegion, setSelectedRegion] = useState<string>('North America');
   const [selectedProvince, setSelectedProvince] = useState<string>('All');
   const [selectedUni, setSelectedUni] = useState<any>(null);
@@ -49,19 +50,46 @@ export default function Explore() {
   const [filterByPreferences, setFilterByPreferences] = useState(false);
   const [userPreferences, setUserPreferences] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [savedUniversities, setSavedUniversities] = useState<any[]>([]);
 
   useEffect(() => {
-    // Check if user is logged in
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-    }
+    const loadUser = () => {
+      const storedUser = localStorage.getItem('user');
+      if (storedUser) {
+        setUser(JSON.parse(storedUser));
+      }
+    };
+    
+    loadUser();
     
     // Load user preferences
     const storedPreferences = localStorage.getItem('userPreferences');
     if (storedPreferences) {
       setUserPreferences(JSON.parse(storedPreferences));
     }
+
+    // Load saved universities
+    const saved = localStorage.getItem('savedUniversities');
+    if (saved) {
+      setSavedUniversities(JSON.parse(saved));
+    }
+    
+    // Update user when localStorage changes
+    const handleStorageChange = () => {
+      loadUser();
+    };
+    
+    // Update user when custom login event is dispatched
+    const handleUserUpdate = () => {
+      loadUser();
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('userLogin', handleUserUpdate);
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('userLogin', handleUserUpdate);
+    };
   }, []);
 
   useEffect(() => {
@@ -75,6 +103,16 @@ export default function Explore() {
   }, [selectedRegion, selectedProvince]);
 
   const handleLogout = () => {
+    // Preserve profile data before clearing user
+    const currentUser = localStorage.getItem('user');
+    if (currentUser) {
+      const parsedUser = JSON.parse(currentUser);
+      localStorage.setItem('userProfileData', JSON.stringify({
+        name: parsedUser.name,
+        profilePicture: parsedUser.profilePicture,
+      }));
+    }
+    
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     setUser(null);
@@ -85,6 +123,23 @@ export default function Explore() {
     setSelectedUni(uni);
     // Store selected university for AI context
     localStorage.setItem('selectedUniversity', JSON.stringify(uni));
+  };
+
+  const toggleSaveUniversity = (uni: any) => {
+    const isSaved = savedUniversities.some(u => u.id === uni.id);
+    if (isSaved) {
+      const updated = savedUniversities.filter(u => u.id !== uni.id);
+      setSavedUniversities(updated);
+      localStorage.setItem('savedUniversities', JSON.stringify(updated));
+    } else {
+      const updated = [...savedUniversities, uni];
+      setSavedUniversities(updated);
+      localStorage.setItem('savedUniversities', JSON.stringify(updated));
+    }
+  };
+
+  const isUniversitySaved = (uniId: number) => {
+    return savedUniversities.some(u => u.id === uniId);
   };
 
   const handleRegionChange = (region: string) => {
@@ -155,7 +210,11 @@ export default function Explore() {
                     className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
                   >
                     <div className="w-8 h-8 rounded-full bg-[#9370DB] flex items-center justify-center text-white text-sm font-medium">
-                      {user.name ? user.name.charAt(0).toUpperCase() : user.email.charAt(0).toUpperCase()}
+                      {user.profilePicture ? (
+                        <img src={user.profilePicture} alt="Profile" className="w-full h-full rounded-full object-cover" />
+                      ) : (
+                        user.name ? user.name.charAt(0).toUpperCase() : user.email.charAt(0).toUpperCase()
+                      )}
                     </div>
                     <span className="text-slate-800 dark:text-dark-text text-sm">Welcome, {user.name || user.email}</span>
                     <span className="text-slate-800 dark:text-dark-text hover:text-[#9370DB] dark:hover:text-dark-violet transition-colors text-xs ml-2 transform transition-transform duration-200">
@@ -164,9 +223,9 @@ export default function Explore() {
                   </button>
                   {dropdownOpen && (
                     <div className="absolute top-full left-0 mt-2 bg-[#C8C8E0] dark:bg-dark-bg-secondary border border-[#A8A8C8] dark:border-dark-border rounded-lg shadow-lg py-2 w-48 z-50 animate-fade-in-down">
-                      <button className="w-full text-left px-4 py-2 text-slate-800 dark:text-dark-text hover:bg-[#A8A8C8] dark:hover:bg-dark-bg-tertiary transition-colors text-sm">
+                      <a href="/profile" className="block w-full text-left px-4 py-2 text-slate-800 dark:text-dark-text hover:bg-[#A8A8C8] dark:hover:bg-dark-bg-tertiary transition-colors text-sm">
                         My Profile
-                      </button>
+                      </a>
                       <a href="/settings" className="block w-full text-left px-4 py-2 text-slate-800 dark:text-dark-text hover:bg-[#A8A8C8] dark:hover:bg-dark-bg-tertiary transition-colors text-sm">
                         Settings
                       </a>
@@ -183,15 +242,44 @@ export default function Explore() {
             </div>
             <div className="flex items-center gap-6">
               <div className="hidden md:flex items-center gap-6">
-                <a href="/" className="text-slate-800 dark:text-dark-text hover:text-[#9370DB] dark:hover:text-dark-violet transition-colors text-sm">
+                <a href="/" className="text-black hover:text-[#9370DB] transition-colors text-sm">
                   Home
                 </a>
-                <a href="/explore" className="text-slate-800 dark:text-dark-text hover:text-[#9370DB] dark:hover:text-dark-violet transition-colors text-sm">
+                <a href="/explore" className="text-black hover:text-[#9370DB] transition-colors text-sm">
                   Explore
                 </a>
-                <a href="/chat" className="text-slate-800 dark:text-dark-text hover:text-[#9370DB] dark:hover:text-dark-violet transition-colors text-sm">
+                <a href="/chat" className="text-black hover:text-[#9370DB] transition-colors text-sm">
                   Chat
                 </a>
+                {user?.role === 'admin' && (
+                  <div 
+                    className="relative"
+                    onMouseEnter={() => setAdminDropdownOpen(true)}
+                    onMouseLeave={() => setAdminDropdownOpen(false)}
+                  >
+                    <button 
+                      className="flex items-center gap-2 text-[#9370DB] dark:text-dark-violet hover:text-[#7B68EE] dark:hover:text-dark-violet-hover transition-colors text-sm"
+                    >
+                      Admin
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                    {adminDropdownOpen && (
+                      <div className="absolute top-full right-0 mt-2 bg-black border border-gray-700 rounded-lg shadow-lg py-2 w-48 z-50">
+                        <a href="/admin" className="block w-full text-left px-4 py-2 text-white hover:bg-[#9370DB] transition-colors text-sm">
+                          Universities
+                        </a>
+                        <a href="/admin" className="block w-full text-left px-4 py-2 text-white hover:bg-[#9370DB] transition-colors text-sm">
+                          Users
+                        </a>
+                        <a href="/settings" className="block w-full text-left px-4 py-2 text-white hover:bg-[#9370DB] transition-colors text-sm">
+                          Settings
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -302,12 +390,29 @@ export default function Explore() {
                 <div
                   key={index}
                   onClick={() => handleUniClick(uni)}
-                  className={`bg-[#C8C8E0] dark:bg-dark-bg-secondary border rounded-lg p-4 transition-colors cursor-pointer ${
+                  className={`bg-[#C8C8E0] dark:bg-dark-bg-secondary border rounded-lg p-4 transition-colors cursor-pointer flex items-center justify-between ${
                     selectedUni?.id === uni.name ? 'border-[#9370DB] dark:border-dark-violet bg-[#D8D8E8] dark:bg-dark-bg-tertiary' : 'border-[#A8A8C8] dark:border-dark-border hover:border-[#9370DB] dark:hover:border-dark-violet'
                   }`}
                 >
-                  <h3 className="font-semibold text-slate-900 dark:text-dark-text mb-1">{uni.name}</h3>
-                  <p className="text-sm text-slate-800 dark:text-dark-text-secondary">{uni.location}</p>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-slate-900 dark:text-dark-text mb-1">{uni.name}</h3>
+                    <p className="text-sm text-slate-800 dark:text-dark-text-secondary">{uni.location}</p>
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleSaveUniversity(uni);
+                    }}
+                    className={`p-2 rounded-lg transition-colors ${
+                      isUniversitySaved(uni.id)
+                        ? 'text-[#9370DB] dark:text-dark-violet'
+                        : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400'
+                    }`}
+                  >
+                    <svg className="w-6 h-6" fill={isUniversitySaved(uni.id) ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                    </svg>
+                  </button>
                 </div>
               ))}
             </div>
@@ -316,15 +421,29 @@ export default function Explore() {
           {/* Right Side Panel */}
           {selectedUni && (
             <div className="w-96 bg-[#C8C8E0] dark:bg-dark-bg-secondary border-l border-[#A8A8C8] dark:border-dark-border p-6 overflow-y-auto animate-fade-in-right">
-              <button
-                onClick={() => setSelectedUni(null)}
-                className="mb-4 text-slate-800 dark:text-dark-text hover:text-[#9370DB] dark:hover:text-dark-violet transition-colors flex items-center gap-2"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-                Back
-              </button>
+              <div className="flex items-center justify-between mb-4">
+                <button
+                  onClick={() => setSelectedUni(null)}
+                  className="text-slate-800 dark:text-dark-text hover:text-[#9370DB] dark:hover:text-dark-violet transition-colors flex items-center gap-2"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                  Back
+                </button>
+                <button
+                  onClick={() => toggleSaveUniversity(selectedUni)}
+                  className={`p-2 rounded-lg transition-colors ${
+                    isUniversitySaved(selectedUni.id)
+                      ? 'text-[#9370DB] dark:text-dark-violet'
+                      : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400'
+                  }`}
+                >
+                  <svg className="w-6 h-6" fill={isUniversitySaved(selectedUni.id) ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                  </svg>
+                </button>
+              </div>
               <div className="w-full h-64 bg-white dark:bg-dark-bg-tertiary rounded-lg mb-4 flex items-center justify-center overflow-hidden">
                 <img 
                   src={selectedUni.image} 

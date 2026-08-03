@@ -69,6 +69,16 @@ export default function RegionPage() {
   }, []);
 
   const handleLogout = () => {
+    // Preserve profile data before clearing user
+    const currentUser = localStorage.getItem('user');
+    if (currentUser) {
+      const parsedUser = JSON.parse(currentUser);
+      localStorage.setItem('userProfileData', JSON.stringify({
+        name: parsedUser.name,
+        profilePicture: parsedUser.profilePicture,
+      }));
+    }
+    
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     setUser(null);
