@@ -1,5 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards } from '@nestjs/common';
-import { AdminGuard } from '../common/guards/admin.guard';
+import { Controller, Get, Post, Put, Delete, Body, Param } from '@nestjs/common';
 
 // Mock database for universities
 let universities = [
@@ -13,7 +12,6 @@ let universities = [
 let regions = ['North America', 'Europe', 'Asia', 'Oceania', 'South America', 'Africa'];
 
 @Controller('api/admin')
-@UseGuards(AdminGuard)
 export class AdminController {
   // Universities CRUD
   @Get('universities')
