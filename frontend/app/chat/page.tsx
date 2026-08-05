@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Navbar from '../../components/Navbar';
+import LoginModal from '@/components/LoginModal';
 import { Plus, Trash2 } from 'lucide-react';
 
 interface Chat {
@@ -81,6 +82,19 @@ export default function ChatPage() {
   const [waitingForPasscode, setWaitingForPasscode] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPath, setCurrentPath] = useState('/');
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [showLogin, setShowLogin] = useState(false);
+
+  useEffect(() => {
+    const checkLogin = () => setIsLoggedIn(!!localStorage.getItem('user'));
+    checkLogin();
+    window.addEventListener('storage', checkLogin);
+    window.addEventListener('userLogin', checkLogin);
+    return () => {
+      window.removeEventListener('storage', checkLogin);
+      window.removeEventListener('userLogin', checkLogin);
+    };
+  }, []);
 
   useEffect(() => {
     setCurrentPath(window.location.pathname);
@@ -191,6 +205,11 @@ export default function ChatPage() {
   };
 
   const sendMessage = async () => {
+    if (!isLoggedIn) {
+      setShowLogin(true);
+      return;
+    }
+
     if (!input.trim()) return;
 
     const userMessage = input.trim();
@@ -432,6 +451,19 @@ export default function ChatPage() {
           {!currentChat ? (
             <div className="flex-1 flex flex-col items-center justify-center px-4">
               <div className="text-center max-w-2xl w-full">
+                {!isLoggedIn && (
+                  <div className="mb-6 p-4 bg-[#9370DB]/10 border border-[#9370DB] rounded-lg flex items-center justify-between gap-4">
+                    <p className="text-slate-800 font-medium text-sm">
+                      Sign in to start chatting with the AI assistant
+                    </p>
+                    <button
+                      onClick={() => setShowLogin(true)}
+                      className="px-4 py-2 bg-[#9370DB] text-white rounded-lg font-medium hover:bg-[#7B68EE] transition-colors text-sm whitespace-nowrap"
+                    >
+                      Sign In
+                    </button>
+                  </div>
+                )}
                 <h2 className="text-3xl font-bold text-slate-800 mb-2">How can I help you today?</h2>
                 <p className="text-slate-600 mb-8">I can help you find universities, explore courses, and navigate your academic journey.</p>
                 
@@ -442,7 +474,7 @@ export default function ChatPage() {
                         setInput(randomPrompt);
                         sendMessage();
                       }}
-                      className="col-span-2 p-4 bg-white border border-[#A8A8C8] rounded-lg hover:border-[#9370DB] hover:shadow-md transition-all text-left"
+                      className="col-span-2 p-4 bg-white border border-[#A8A8C8] rounded-lg hover:border-[#9370DB] hover:shadow-md transition-all text-left animate-rise-in"
                     >
                       <p className="text-slate-800 font-medium">{randomPrompt}</p>
                     </button>
@@ -453,7 +485,7 @@ export default function ChatPage() {
                           setInput('What are the top universities for computer science?');
                           sendMessage();
                         }}
-                        className="p-4 bg-white border border-[#A8A8C8] rounded-lg hover:border-[#9370DB] hover:shadow-md transition-all text-left"
+                        className="p-4 bg-white border border-[#A8A8C8] rounded-lg hover:border-[#9370DB] hover:shadow-md transition-all text-left animate-rise-in"
                       >
                         <p className="text-slate-800 font-medium">What are the top universities for computer science?</p>
                       </button>
@@ -462,7 +494,7 @@ export default function ChatPage() {
                           setInput('How do I write a strong college application essay?');
                           sendMessage();
                         }}
-                        className="p-4 bg-white border border-[#A8A8C8] rounded-lg hover:border-[#9370DB] hover:shadow-md transition-all text-left"
+                        className="p-4 bg-white border border-[#A8A8C8] rounded-lg hover:border-[#9370DB] hover:shadow-md transition-all text-left animate-rise-in-1"
                       >
                         <p className="text-slate-800 font-medium">How do I write a strong college application essay?</p>
                       </button>
@@ -471,7 +503,7 @@ export default function ChatPage() {
                           setInput('What scholarships are available for international students?');
                           sendMessage();
                         }}
-                        className="p-4 bg-white border border-[#A8A8C8] rounded-lg hover:border-[#9370DB] hover:shadow-md transition-all text-left"
+                        className="p-4 bg-white border border-[#A8A8C8] rounded-lg hover:border-[#9370DB] hover:shadow-md transition-all text-left animate-rise-in-2"
                       >
                         <p className="text-slate-800 font-medium">What scholarships are available for international students?</p>
                       </button>
@@ -480,7 +512,7 @@ export default function ChatPage() {
                           setInput('What should I consider when choosing a major?');
                           sendMessage();
                         }}
-                        className="p-4 bg-white border border-[#A8A8C8] rounded-lg hover:border-[#9370DB] hover:shadow-md transition-all text-left"
+                        className="p-4 bg-white border border-[#A8A8C8] rounded-lg hover:border-[#9370DB] hover:shadow-md transition-all text-left animate-rise-in-3"
                       >
                         <p className="text-slate-800 font-medium">What should I consider when choosing a major?</p>
                       </button>
@@ -489,7 +521,7 @@ export default function ChatPage() {
                 </div>
 
                 {/* Input box for custom questions */}
-                <div className="w-full max-w-2xl">
+                <div className="w-full max-w-2xl animate-rise-in-4">
                   <div className="flex gap-2">
                     <textarea
                       value={input}
@@ -577,6 +609,8 @@ export default function ChatPage() {
           )}
         </div>
       </div>
+
+      <LoginModal open={showLogin} onClose={() => setShowLogin(false)} />
     </div>
   );
 }

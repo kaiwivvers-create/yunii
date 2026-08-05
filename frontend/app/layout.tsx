@@ -4,6 +4,7 @@ import "./globals.css";
 import ChatbotWrapper from "@/components/ChatbotWrapper";
 import FloatingBubbles from "@/components/FloatingBubbles";
 import { ThemeProvider } from "@/contexts/ThemeContext";
+import { LanguageProvider } from "@/contexts/LanguageContext";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -32,9 +33,11 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         <ThemeProvider>
-          <FloatingBubbles />
-          {children}
-          <ChatbotWrapper />
+          <LanguageProvider>
+            <FloatingBubbles />
+            {children}
+            <ChatbotWrapper />
+          </LanguageProvider>
         </ThemeProvider>
       </body>
     </html>

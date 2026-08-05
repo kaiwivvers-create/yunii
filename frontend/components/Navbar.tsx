@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Menu } from 'lucide-react';
+import { Menu, ChevronDown, ChevronUp, GraduationCap, Languages } from 'lucide-react';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface NavbarProps {
   currentPage?: string;
@@ -12,10 +13,36 @@ interface NavbarProps {
 }
 
 export default function Navbar({ currentPage, onToggleSidebar, showHamburger }: NavbarProps) {
+  const { lang, setLang, t } = useLanguage();
   const [user, setUser] = useState<any>(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [adminDropdownOpen, setAdminDropdownOpen] = useState(false);
+  const [appName, setAppName] = useState('UniVerse');
+  const [appIcon, setAppIcon] = useState('');
   const router = useRouter();
+
+  useEffect(() => {
+    // Load app branding from settings (name + icon)
+    fetch('/api/admin/settings')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((s) => {
+        if (!s) return;
+        const name = s.appName || 'UniVerse';
+        setAppName(name);
+        setAppIcon(s.appIcon || '');
+        document.title = `${name} - Discover Universities Worldwide`;
+        if (s.appIcon) {
+          let link = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
+          if (!link) {
+            link = document.createElement('link');
+            link.rel = 'icon';
+            document.head.appendChild(link);
+          }
+          link.href = s.appIcon;
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     const loadUser = () => {
@@ -76,6 +103,20 @@ export default function Navbar({ currentPage, onToggleSidebar, showHamburger }: 
       <div className="px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center gap-6">
+            {!user && (
+              <Link href="/" className="flex items-center gap-2.5 group">
+                <div className="w-8 h-8 rounded-lg bg-[#9370DB]/10 text-[#9370DB] flex items-center justify-center overflow-hidden">
+                  {appIcon ? (
+                    <img src={appIcon} alt="App icon" className="w-full h-full object-cover" />
+                  ) : (
+                    <GraduationCap className="w-5 h-5" />
+                  )}
+                </div>
+                <span className="font-bold text-slate-900 text-base group-hover:text-[#9370DB] transition-colors">
+                  {appName}
+                </span>
+              </Link>
+            )}
             {user ? (
               <div className="relative">
                 <button 
@@ -90,23 +131,25 @@ export default function Navbar({ currentPage, onToggleSidebar, showHamburger }: 
                     )}
                   </div>
                   <span className="text-slate-800 text-sm">Welcome, {user.name || user.email}</span>
-                  <span className="text-slate-800 hover:text-[#9370DB] transition-colors text-xs ml-2 transform transition-transform duration-200">
-                    {dropdownOpen ? '▲' : '▼'}
-                  </span>
+                  {dropdownOpen ? (
+                    <ChevronUp className="w-4 h-4 text-slate-500" />
+                  ) : (
+                    <ChevronDown className="w-4 h-4 text-slate-500" />
+                  )}
                 </button>
                 {dropdownOpen && (
                   <div className="absolute top-full left-0 mt-2 bg-[#C8C8E0] border border-[#A8A8C8] rounded-lg shadow-lg py-2 w-48 z-50 animate-fade-in-down">
                     <a href="/profile" className="block w-full text-left px-4 py-2 text-slate-800 hover:bg-[#A8A8C8] transition-colors text-sm">
-                      My Profile
+                      {t('myProfile')}
                     </a>
                     <a href="/settings" className="block w-full text-left px-4 py-2 text-slate-800 hover:bg-[#A8A8C8] transition-colors text-sm">
-                      Settings
+                      {t('settings')}
                     </a>
                     <button
                       onClick={handleLogout}
                       className="w-full text-left px-4 py-2 text-[#ff6b6b] hover:bg-[#ffe2e2] transition-colors text-sm"
                     >
-                      Logout
+                      {t('logout')}
                     </button>
                   </div>
                 )}
@@ -114,6 +157,16 @@ export default function Navbar({ currentPage, onToggleSidebar, showHamburger }: 
             ) : null}
           </div>
           <div className="flex items-center gap-6">
+            {/* Language toggle */}
+            <button
+              onClick={() => setLang(lang === 'en' ? 'zh' : 'en')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#9370DB]/15 text-[#6B4FBF] hover:bg-[#9370DB]/25 transition-colors text-xs font-semibold"
+              title="Switch language / 切换语言"
+            >
+              <Languages className="w-3.5 h-3.5" />
+              {lang === 'en' ? 'EN' : '中文'}
+            </button>
+
             {/* Hamburger menu for sidebar toggle */}
             {showHamburger && onToggleSidebar && (
               <button
@@ -126,13 +179,19 @@ export default function Navbar({ currentPage, onToggleSidebar, showHamburger }: 
             
             <div className="hidden md:flex items-center gap-6">
               <Link href="/" className={`text-sm transition-colors ${currentPage === 'home' ? 'text-gray-500 cursor-default' : 'text-black hover:text-[#9370DB]'}`}>
-                Home
+                {t('home')}
               </Link>
               <Link href="/explore" className={`text-sm transition-colors ${currentPage === 'explore' ? 'text-gray-500 cursor-default' : 'text-black hover:text-[#9370DB]'}`}>
-                Explore
+                {t('explore')}
+              </Link>
+              <Link href="/compare" className={`text-sm transition-colors ${currentPage === 'compare' ? 'text-gray-500 cursor-default' : 'text-black hover:text-[#9370DB]'}`}>
+                {t('compare')}
+              </Link>
+              <Link href="/guides" className={`text-sm transition-colors ${currentPage === 'guides' ? 'text-gray-500 cursor-default' : 'text-black hover:text-[#9370DB]'}`}>
+                {t('guides')}
               </Link>
               <Link href="/chat" className={`text-sm transition-colors ${currentPage === 'chat' ? 'text-gray-500 cursor-default' : 'text-black hover:text-[#9370DB]'}`}>
-                Chat
+                {t('chat')}
               </Link>
               {user?.role === 'admin' && (
                 <div 
@@ -143,38 +202,44 @@ export default function Navbar({ currentPage, onToggleSidebar, showHamburger }: 
                   <button 
                     className="flex items-center gap-2 text-black hover:text-[#9370DB] transition-colors text-sm px-4 py-2"
                   >
-                    Admin ▼
+                    {t('admin')}
+                    <ChevronDown className="w-4 h-4" />
                   </button>
                   {adminDropdownOpen && (
                     <div className="absolute top-0 right-0 mt-12 bg-black border border-gray-700 rounded-lg shadow-lg py-2 w-48 z-50">
-                      <a href="/admin" className="block w-full text-left px-4 py-2 text-white hover:bg-[#9370DB] transition-colors text-sm">
-                        Universities
-                      </a>
-                      <a href="/admin/users" className="block w-full text-left px-4 py-2 text-white hover:bg-[#9370DB] transition-colors text-sm">
-                        Users
-                      </a>
+                      <a href="/admin" className="block w-full text-left px-4 py-2 text-white hover:bg-[#9370DB] transition-colors text-sm">Overview</a>
+                      <a href="/admin?section=content" className="block w-full text-left px-4 py-2 text-white hover:bg-[#9370DB] transition-colors text-sm">Content</a>
+                      <a href="/admin/users" className="block w-full text-left px-4 py-2 text-white hover:bg-[#9370DB] transition-colors text-sm">Users</a>
+                      <a href="/admin?section=activity" className="block w-full text-left px-4 py-2 text-white hover:bg-[#9370DB] transition-colors text-sm">Activity Log</a>
+                      <a href="/admin?section=versions" className="block w-full text-left px-4 py-2 text-white hover:bg-[#9370DB] transition-colors text-sm">Versions</a>
+                      <a href="/admin?section=reports" className="block w-full text-left px-4 py-2 text-white hover:bg-[#9370DB] transition-colors text-sm">Reports</a>
+                      <a href="/admin?section=database" className="block w-full text-left px-4 py-2 text-white hover:bg-[#9370DB] transition-colors text-sm">Database</a>
+                      <a href="/admin?section=roles" className="block w-full text-left px-4 py-2 text-white hover:bg-[#9370DB] transition-colors text-sm">Roles</a>
+                      <a href="/admin?section=permissions" className="block w-full text-left px-4 py-2 text-white hover:bg-[#9370DB] transition-colors text-sm">Permissions</a>
+                      <a href="/admin?section=settings" className="block w-full text-left px-4 py-2 text-white hover:bg-[#9370DB] transition-colors text-sm">Settings</a>
                     </div>
                   )}
                 </div>
               )}
-              {!user ? (
+              {!user && !isAuthPage ? (
                 <Link href="/login" className="text-slate-800 hover:text-[#9370DB] transition-colors text-sm">
-                  Login
+                  {t('login')}
                 </Link>
               ) : null}
             </div>
           {!user && (
-            <>
-              {isAuthPage ? (
-                <span className="px-4 py-2 bg-[#9370DB] text-white rounded text-sm font-medium cursor-default opacity-60">
-                  {currentPage === 'login' ? 'Sign Up' : 'Sign Up'}
-                </span>
-              ) : (
-                <Link href="/signup" className="px-4 py-2 bg-[#9370DB] text-white rounded text-sm font-medium hover:bg-[#7B68EE] transition-colors">
-                  Get Started
-                </Link>
-              )}
-            </>
+            isAuthPage ? (
+              <Link
+                href={currentPage === 'login' ? '/signup' : '/login'}
+                className="px-4 py-2 bg-[#9370DB] text-white rounded text-sm font-medium hover:bg-[#7B68EE] transition-colors"
+              >
+                {currentPage === 'login' ? t('signup') : t('signIn')}
+              </Link>
+            ) : (
+              <Link href="/signup" className="px-4 py-2 bg-[#9370DB] text-white rounded text-sm font-medium hover:bg-[#7B68EE] transition-colors">
+                {t('getStarted')}
+              </Link>
+            )
           )}
           </div>
         </div>

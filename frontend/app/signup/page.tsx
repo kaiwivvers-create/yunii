@@ -86,7 +86,7 @@ export default function Signup() {
 
         {/* Right side - White Form */}
         <div className="w-full lg:w-1/2 bg-white flex items-center justify-center p-8 lg:p-16">
-          <div className="w-full max-w-md">
+          <div className="w-full max-w-md animate-rise-in">
             <div className="mb-8">
               <p className="text-base text-slate-600">
                 Already have an account?{' '}

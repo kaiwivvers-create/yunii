@@ -106,15 +106,15 @@ export default function Home() {
       {/* Hero Section */}
       <section className={`pt-32 pb-16 px-4 sm:px-6 lg:px-8 relative z-10 transition-all duration-500 ${isBlurred ? 'opacity-50 pointer-events-none' : ''}`}>
         <div className="text-center">
-          <h1 className="text-4xl sm:text-5xl font-bold text-slate-900  mb-6">
+          <h1 className="text-4xl sm:text-5xl font-bold text-slate-900  mb-6 animate-rise-in">
             Find Your Perfect University
           </h1>
-          <p className="text-lg text-slate-800  mb-10 max-w-2xl mx-auto">
+          <p className="text-lg text-slate-800  mb-10 max-w-2xl mx-auto animate-rise-in-1">
             Discover universities and programs from around the world. Your journey to higher education starts here.
           </p>
           
           {/* Search Bar */}
-          <div className="max-w-2xl mx-auto mb-12">
+          <div className="max-w-2xl mx-auto mb-12 animate-rise-in-2">
             <div className="flex gap-2 border border-slate-300  rounded-lg overflow-hidden bg-white/80 backdrop-blur-sm">
               <input
                 type="text"
@@ -128,7 +128,7 @@ export default function Home() {
           </div>
 
           {/* Quick Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 animate-rise-in-3">
             <div className="text-center">
               <div className="text-2xl font-bold text-slate-900 ">150+</div>
               <div className="text-sm text-slate-800 ">Countries</div>
@@ -174,21 +174,21 @@ export default function Home() {
           </div>
 
           <div className="grid md:grid-cols-3 gap-6">
-            <div className="bg-[#C8C8E0]  border border-slate-200  rounded-lg p-6">
+            <div className="bg-[#C8C8E0]  border border-slate-200  rounded-lg p-6 animate-rise-in">
               <h3 className="font-semibold text-slate-900  mb-2">Smart Search</h3>
               <p className="text-sm text-slate-800 ">
                 Advanced filters to find universities that match your specific needs, location, and budget
               </p>
             </div>
 
-            <div className="bg-[#C8C8E0]  border border-slate-200  rounded-lg p-6">
+            <div className="bg-[#C8C8E0]  border border-slate-200  rounded-lg p-6 animate-rise-in-1">
               <h3 className="font-semibold text-slate-900  mb-2">Detailed Insights</h3>
               <p className="text-sm text-slate-800 ">
                 Comprehensive data on rankings, programs, tuition, and student life
               </p>
             </div>
 
-            <div className="bg-[#C8C8E0]  border border-slate-200  rounded-lg p-6">
+            <div className="bg-[#C8C8E0]  border border-slate-200  rounded-lg p-6 animate-rise-in-2">
               <h3 className="font-semibold text-slate-900  mb-2">Global Network</h3>
               <p className="text-sm text-slate-800 ">
                 Connect with students and alumni from universities around the world
@@ -210,13 +210,13 @@ export default function Home() {
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             {!user && (
               <Link href="/signup">
-                <button className="px-6 py-3 bg-[#9370DB] text-white rounded font-medium hover:bg-[#7B68EE] transition-colors">
+                <button className="px-6 py-3 bg-[#9370DB] text-white rounded font-medium hover:bg-[#7B68EE] transition-colors animate-rise-in-3">
                   Create Free Account
                 </button>
               </Link>
             )}
             <Link href="/explore">
-              <button className="px-6 py-3 border border-slate-300  text-slate-900  rounded font-medium hover:bg-slate-50  transition-colors">
+              <button className="px-6 py-3 border border-slate-300  text-slate-900  rounded font-medium hover:bg-slate-50  transition-colors animate-rise-in-4">
                 Explore Universities
               </button>
             </Link>

@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import Navbar from '../../../components/Navbar';
+import LoginModal from '@/components/LoginModal';
+import { ChevronLeft } from 'lucide-react';
 
 const regionData: Record<string, { name: string; location: string; description: string; province: string; image: string }[]> = {
   'north-america': [
@@ -56,6 +58,7 @@ export default function RegionPage() {
   const [selectedProvince, setSelectedProvince] = useState<string>('All');
   const [selectedUni, setSelectedUni] = useState<any>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [showLogin, setShowLogin] = useState(false);
   const [expandedRegion, setExpandedRegion] = useState<string | null>(region);
 
   const universities = regionData[region] || [];
@@ -87,6 +90,10 @@ export default function RegionPage() {
   };
 
   const handleUniClick = (uni: any) => {
+    if (!user) {
+      setShowLogin(true);
+      return;
+    }
     setSelectedUni(uni);
     setModalOpen(true);
   };
@@ -112,8 +119,9 @@ export default function RegionPage() {
       <section className="pt-24 pb-16 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
           <div className="mb-8">
-            <Link href="/explore" className="text-[#9370DB] hover:underline text-sm">
-              ← Back to regions
+            <Link href="/explore" className="inline-flex items-center gap-1.5 text-[#9370DB] hover:underline text-sm">
+              <ChevronLeft className="w-4 h-4" />
+              Back to regions
             </Link>
           </div>
           
@@ -197,6 +205,8 @@ export default function RegionPage() {
           </div>
         </div>
       )}
+
+      <LoginModal open={showLogin} onClose={() => setShowLogin(false)} />
     </div>
   );
 }

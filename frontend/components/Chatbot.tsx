@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import { MessageSquare, Send, X } from 'lucide-react';
+import LoginModal from './LoginModal';
 
 const parseMarkdown = (text: string) => {
   // Bold: **text**
@@ -64,9 +65,27 @@ export default function Chatbot() {
   const [message, setMessage] = useState('');
   const [chatHistory, setChatHistory] = useState<Array<{role: 'user' | 'assistant', content: string}>>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [showLogin, setShowLogin] = useState(false);
   const pathname = usePathname();
 
+  useEffect(() => {
+    const checkLogin = () => setIsLoggedIn(!!localStorage.getItem('user'));
+    checkLogin();
+    window.addEventListener('storage', checkLogin);
+    window.addEventListener('userLogin', checkLogin);
+    return () => {
+      window.removeEventListener('storage', checkLogin);
+      window.removeEventListener('userLogin', checkLogin);
+    };
+  }, []);
+
   const handleSendMessage = async () => {
+    if (!isLoggedIn) {
+      setShowLogin(true);
+      return;
+    }
+
     if (!message.trim()) return;
     
     setIsLoading(true);
@@ -172,7 +191,13 @@ export default function Chatbot() {
     <div className="fixed bottom-4 right-4 z-50">
       {!isOpen ? (
         <button
-          onClick={() => setIsOpen(true)}
+          onClick={() => {
+            if (!isLoggedIn) {
+              setShowLogin(true);
+            } else {
+              setIsOpen(true);
+            }
+          }}
           className="w-14 h-14 bg-[#9370DB] dark:bg-dark-violet rounded-full shadow-lg flex items-center justify-center hover:bg-[#7B68EE] dark:hover:bg-dark-violet-hover transition-colors"
         >
           <MessageSquare className="w-6 h-6 text-white" />
@@ -257,6 +282,8 @@ export default function Chatbot() {
           </div>
         </div>
       )}
+
+      <LoginModal open={showLogin} onClose={() => setShowLogin(false)} />
     </div>
   );
 }
