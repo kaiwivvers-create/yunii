@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTheme } from '@/contexts/ThemeContext';
+import Navbar from '../../components/Navbar';
 
 export default function Profile() {
   const router = useRouter();
@@ -12,8 +13,6 @@ export default function Profile() {
   const [username, setUsername] = useState('');
   const [profilePicture, setProfilePicture] = useState<string>('');
   const [savedUniversities, setSavedUniversities] = useState<any[]>([]);
-  const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [adminDropdownOpen, setAdminDropdownOpen] = useState(false);
   const [showCropper, setShowCropper] = useState(false);
   const [imageToCrop, setImageToCrop] = useState<string>('');
   const [cropArea, setCropArea] = useState({ x: 0, y: 0, width: 200, height: 200 });
@@ -422,89 +421,7 @@ export default function Profile() {
           )}
 
           {/* Navigation */}
-          <nav className="fixed top-0 left-0 right-0 z-50 bg-[#C8C8E0] dark:bg-dark-bg-secondary border-b border-[#A8A8C8] dark:border-dark-border">
-            <div className="px-4 sm:px-6 lg:px-8">
-              <div className="flex items-center justify-between">
-                <div className="hidden md:flex items-center gap-6">
-                  <a href="/" className="text-black hover:text-[#9370DB] transition-colors text-sm">
-                    Home
-                  </a>
-                  <a href="/explore" className="text-black hover:text-[#9370DB] transition-colors text-sm">
-                    Explore
-                  </a>
-                  <a href="/chat" className="text-black hover:text-[#9370DB] transition-colors text-sm">
-                    Chat
-                  </a>
-                  <a href="/settings" className="text-black hover:text-[#9370DB] transition-colors text-sm">
-                    Settings
-                  </a>
-                  {user?.role === 'admin' && (
-                    <div 
-                      className="relative"
-                      onMouseEnter={() => setAdminDropdownOpen(true)}
-                      onMouseLeave={() => setAdminDropdownOpen(false)}
-                    >
-                      <button 
-                        className="flex items-center gap-2 text-[#9370DB] dark:text-dark-violet hover:text-[#7B68EE] dark:hover:text-dark-violet-hover transition-colors text-sm"
-                      >
-                        Admin
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                      </button>
-                      {adminDropdownOpen && (
-                        <div className="absolute top-full right-0 mt-2 bg-black border border-gray-700 rounded-lg shadow-lg py-2 w-48 z-50">
-                          <a href="/admin" className="block w-full text-left px-4 py-2 text-white hover:bg-[#9370DB] transition-colors text-sm">
-                            Universities
-                          </a>
-                          <a href="/admin" className="block w-full text-left px-4 py-2 text-white hover:bg-[#9370DB] transition-colors text-sm">
-                            Users
-                          </a>
-                          <a href="/settings" className="block w-full text-left px-4 py-2 text-white hover:bg-[#9370DB] transition-colors text-sm">
-                            Settings
-                          </a>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-                <div className="flex items-center gap-4">
-                  <div className="relative">
-                    <button 
-                      onClick={() => setDropdownOpen(!dropdownOpen)}
-                      className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
-                    >
-                      <div className="w-8 h-8 rounded-full bg-[#9370DB] flex items-center justify-center text-white text-sm font-medium">
-                        {user.profilePicture ? (
-                          <img src={user.profilePicture} alt="Profile" className="w-full h-full rounded-full object-cover" />
-                        ) : (
-                          user.name ? user.name.charAt(0).toUpperCase() : user.email.charAt(0).toUpperCase()
-                        )}
-                      </div>
-                      <span className="text-slate-800 dark:text-dark-text text-sm">Welcome, {user.name || user.email}</span>
-                      <span className="text-slate-800 dark:text-dark-text hover:text-[#9370DB] dark:hover:text-dark-violet transition-colors text-xs ml-2 transform transition-transform duration-200">
-                        {dropdownOpen ? '▲' : '▼'}
-                      </span>
-                    </button>
-                    {dropdownOpen && (
-                      <div className="absolute top-full left-0 mt-2 bg-[#C8C8E0] dark:bg-dark-bg-secondary border border-[#A8A8C8] dark:border-dark-border rounded-lg shadow-lg py-2 w-48 z-50 animate-fade-in-down">
-                        <button
-                          onClick={() => {
-                            localStorage.removeItem('token');
-                            localStorage.removeItem('user');
-                            router.push('/login');
-                          }}
-                          className="block w-full text-left px-4 py-2 text-slate-800 dark:text-dark-text hover:bg-[#A8A8C8] dark:hover:bg-dark-bg-tertiary transition-colors text-sm"
-                        >
-                          Logout
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </nav>
+          <Navbar currentPage="profile" />
 
       {/* Main Content */}
       <section className="pt-24 pb-12 px-4 max-w-4xl mx-auto relative z-10">

@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
 
     // Build system prompt with context
     let systemPrompt = secretMode 
-      ? `You are Cae, a helpful AI assistant for UniVerse, a university discovery platform that helps students find and explore universities worldwide. You can answer questions about any topic - universities, general knowledge, personal advice, or anything else the user asks. Be helpful, conversational, and provide thoughtful responses.`
+      ? `You are Cae, a helpful AI assistant for UniVerse, a university discovery platform that helps students find and explore universities worldwide. You can answer questions about any topic - universities, general knowledge, personal advice, or anything else the user asks. Be helpful, conversational, and provide thoughtful responses. Only introduce yourself if the user asks "who are you" or similar questions.`
       : `You are Cae, a helpful university assistant for UniVerse, a university discovery platform that helps students find and explore universities worldwide. You answer questions related to:
 - Universities and colleges
 - Courses and academic programs
@@ -26,11 +26,20 @@ export async function POST(request: NextRequest) {
 - Study tips and academic advice
 - The UniVerse app features and navigation
 
-If a user asks about anything outside these topics (medical advice, legal advice, general knowledge, etc.), politely decline and redirect them to appropriate resources. Keep responses concise and helpful.`;
+If a user asks about anything outside these topics (medical advice, legal advice, general knowledge, etc.), politely decline and redirect them to appropriate resources. Keep responses concise and helpful. Only introduce yourself if the user asks "who are you" or similar questions.`;
 
     // Add context to system prompt if provided
     if (context) {
       systemPrompt += `\n\nContext about the current situation:\n${context}\n\nUse this context to provide relevant answers based on the user's current page and preferences.`;
+    }
+
+    // Build conversation history for context
+    let conversationHistory = '';
+    if (history && history.length > 0) {
+      conversationHistory = '\n\nPrevious conversation:\n';
+      history.forEach((msg: any) => {
+        conversationHistory += `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}\n`;
+      });
     }
 
     const response = await fetch(
@@ -45,7 +54,7 @@ If a user asks about anything outside these topics (medical advice, legal advice
             {
               parts: [
                 {
-                  text: `${systemPrompt}
+                  text: `${systemPrompt}${conversationHistory}
 
 User: ${message}`
                 }

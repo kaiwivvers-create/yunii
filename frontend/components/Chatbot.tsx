@@ -2,12 +2,30 @@
 
 import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
+import { MessageSquare, Send, X } from 'lucide-react';
 
 const parseMarkdown = (text: string) => {
   // Bold: **text**
-  let html = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+  let html = text.replace(/\*\*(.*?)\*\*/g, '<strong style="font-weight: bold;">$1</strong>');
   // Italic: *text* (but not **text** which is already handled)
-  html = html.replace(/(?<!\*)\*(?!\*)(.*?)\*(?!\*)/g, '<em>$1</em>');
+  html = html.replace(/(?<!\*)\*(?!\*)(.*?)\*(?!\*)/g, '<em style="font-style: italic;">$1</em>');
+  
+  // Headings: # Heading, ## Heading, ### Heading
+  html = html.replace(/^### (.*$)/gm, '<h3 style="font-size: 1.17em; font-weight: bold; margin: 1em 0;">$1</h3>');
+  html = html.replace(/^## (.*$)/gm, '<h2 style="font-size: 1.5em; font-weight: bold; margin: 1em 0;">$1</h2>');
+  html = html.replace(/^# (.*$)/gm, '<h1 style="font-size: 2em; font-weight: bold; margin: 1em 0;">$1</h1>');
+  
+  // Horizontal rules: --- or ***
+  html = html.replace(/^\s*[-*]{3,}\s*$/gm, '<hr style="border: none; border-top: 1px solid #ccc; margin: 1em 0;" />');
+  
+  // Blockquotes: > text
+  html = html.replace(/^> (.*$)/gm, '<blockquote style="border-left: 4px solid #ddd; padding-left: 1em; margin: 1em 0; color: #666;">$1</blockquote>');
+  
+  // Inline code: `text`
+  html = html.replace(/`([^`]+)`/g, '<code style="background: #f4f4f4; padding: 2px 4px; border-radius: 3px; font-family: monospace;">$1</code>');
+  
+  // Links: [text](url)
+  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" style="color: #9370DB; text-decoration: underline;">$1</a>');
   
   // Lists: * item - handle consecutive list items
   const lines = html.split('\n');
@@ -16,7 +34,7 @@ const parseMarkdown = (text: string) => {
     if (line.match(/^\* /)) {
       if (!inList) {
         inList = true;
-        return '<ul><li>' + line.replace(/^\* /, '') + '</li>';
+        return '<ul style="margin: 1em 0; padding-left: 2em;"><li>' + line.replace(/^\* /, '') + '</li>';
       }
       return '<li>' + line.replace(/^\* /, '') + '</li>';
     } else {
@@ -32,8 +50,12 @@ const parseMarkdown = (text: string) => {
   }
   html = processedLines.join('\n');
   
-  // Line breaks (but not inside lists)
+  // Line breaks (but not inside lists or after block elements)
   html = html.replace(/\n(?!<)/g, '<br>');
+  
+  // Remove extra breaks after block elements
+  html = html.replace(/(<\/h[1-6]>|<\/ul>|<hr style[^>]*\/>|<\/blockquote>)<br>/g, '$1');
+  
   return html;
 };
 
@@ -153,9 +175,7 @@ export default function Chatbot() {
           onClick={() => setIsOpen(true)}
           className="w-14 h-14 bg-[#9370DB] dark:bg-dark-violet rounded-full shadow-lg flex items-center justify-center hover:bg-[#7B68EE] dark:hover:bg-dark-violet-hover transition-colors"
         >
-          <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-          </svg>
+          <MessageSquare className="w-6 h-6 text-white" />
         </button>
       ) : (
         <div className="w-96 h-[500px] bg-[#C8C8E0] dark:bg-dark-bg-secondary border border-[#A8A8C8] dark:border-dark-border rounded-lg shadow-2xl flex flex-col">
@@ -165,9 +185,7 @@ export default function Chatbot() {
               onClick={() => setIsOpen(false)}
               className="text-slate-800 dark:text-dark-text hover:text-[#9370DB] dark:hover:text-dark-violet transition-colors"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
+              <X className="w-5 h-5" />
             </button>
           </div>
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -215,22 +233,25 @@ export default function Chatbot() {
           </div>
           <div className="p-4 border-t border-[#A8A8C8] dark:border-dark-border">
             <div className="flex gap-2">
-              <input
-                type="text"
+              <textarea
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSendMessage();
+                  }
+                }}
                 placeholder="Type your message..."
-                className="flex-1 px-3 py-2 bg-[#E8E8F0] dark:bg-dark-bg-tertiary border border-[#A8A8C8] dark:border-dark-border rounded-lg text-slate-900 dark:text-dark-text placeholder-slate-500 dark:placeholder-dark-text-secondary focus:outline-none focus:border-[#9370DB] dark:focus:border-dark-violet"
+                rows={1}
+                className="flex-1 px-3 py-2 bg-[#E8E8F0] dark:bg-dark-bg-tertiary border border-[#A8A8C8] dark:border-dark-border rounded-lg text-slate-900 dark:text-dark-text placeholder-slate-500 dark:placeholder-dark-text-secondary focus:outline-none focus:border-[#9370DB] dark:focus:border-dark-violet resize-none"
               />
               <button
                 onClick={handleSendMessage}
                 disabled={isLoading || !message.trim()}
                 className="px-4 py-2 bg-[#9370DB] dark:bg-dark-violet text-white rounded-lg hover:bg-[#7B68EE] dark:hover:bg-dark-violet-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                </svg>
+                <Send className="w-5 h-5" />
               </button>
             </div>
           </div>

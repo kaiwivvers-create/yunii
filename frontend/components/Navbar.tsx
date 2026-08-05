@@ -3,12 +3,15 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { Menu } from 'lucide-react';
 
 interface NavbarProps {
   currentPage?: string;
+  onToggleSidebar?: () => void;
+  showHamburger?: boolean;
 }
 
-export default function Navbar({ currentPage }: NavbarProps) {
+export default function Navbar({ currentPage, onToggleSidebar, showHamburger }: NavbarProps) {
   const [user, setUser] = useState<any>(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [adminDropdownOpen, setAdminDropdownOpen] = useState(false);
@@ -111,37 +114,44 @@ export default function Navbar({ currentPage }: NavbarProps) {
             ) : null}
           </div>
           <div className="flex items-center gap-6">
+            {/* Hamburger menu for sidebar toggle */}
+            {showHamburger && onToggleSidebar && (
+              <button
+                onClick={onToggleSidebar}
+                className="text-slate-800 dark:text-dark-text hover:text-[#9370DB] dark:hover:text-dark-violet transition-colors"
+              >
+                <Menu className="w-6 h-6" />
+              </button>
+            )}
+            
             <div className="hidden md:flex items-center gap-6">
-              <Link href="/explore" className="text-black hover:text-[#9370DB] transition-colors text-sm">
+              <Link href="/" className={`text-sm transition-colors ${currentPage === 'home' ? 'text-gray-500 cursor-default' : 'text-black hover:text-[#9370DB]'}`}>
+                Home
+              </Link>
+              <Link href="/explore" className={`text-sm transition-colors ${currentPage === 'explore' ? 'text-gray-500 cursor-default' : 'text-black hover:text-[#9370DB]'}`}>
                 Explore
               </Link>
-              <Link href="/chat" className="text-black hover:text-[#9370DB] transition-colors text-sm">
+              <Link href="/chat" className={`text-sm transition-colors ${currentPage === 'chat' ? 'text-gray-500 cursor-default' : 'text-black hover:text-[#9370DB]'}`}>
                 Chat
               </Link>
               {user?.role === 'admin' && (
                 <div 
-                  className="relative"
+                  className="relative py-4 -my-2"
                   onMouseEnter={() => setAdminDropdownOpen(true)}
                   onMouseLeave={() => setAdminDropdownOpen(false)}
                 >
                   <button 
-                    className="flex items-center gap-2 text-[#9370DB] hover:text-[#7B68EE] transition-colors text-sm"
+                    className="flex items-center gap-2 text-black hover:text-[#9370DB] transition-colors text-sm px-4 py-2"
                   >
-                    Admin
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
+                    Admin ▼
                   </button>
                   {adminDropdownOpen && (
-                    <div className="absolute top-full right-0 mt-2 bg-black border border-gray-700 rounded-lg shadow-lg py-2 w-48 z-50">
+                    <div className="absolute top-0 right-0 mt-12 bg-black border border-gray-700 rounded-lg shadow-lg py-2 w-48 z-50">
                       <a href="/admin" className="block w-full text-left px-4 py-2 text-white hover:bg-[#9370DB] transition-colors text-sm">
                         Universities
                       </a>
-                      <a href="/admin" className="block w-full text-left px-4 py-2 text-white hover:bg-[#9370DB] transition-colors text-sm">
+                      <a href="/admin/users" className="block w-full text-left px-4 py-2 text-white hover:bg-[#9370DB] transition-colors text-sm">
                         Users
-                      </a>
-                      <a href="/settings" className="block w-full text-left px-4 py-2 text-white hover:bg-[#9370DB] transition-colors text-sm">
-                        Settings
                       </a>
                     </div>
                   )}

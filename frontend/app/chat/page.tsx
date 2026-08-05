@@ -1,8 +1,10 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import Navbar from '../../components/Navbar';
+import { Plus, Trash2 } from 'lucide-react';
 
 interface Chat {
   id: string;
@@ -13,9 +15,26 @@ interface Chat {
 
 const parseMarkdown = (text: string) => {
   // Bold: **text**
-  let html = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+  let html = text.replace(/\*\*(.*?)\*\*/g, '<strong style="font-weight: bold;">$1</strong>');
   // Italic: *text* (but not **text** which is already handled)
-  html = html.replace(/(?<!\*)\*(?!\*)(.*?)\*(?!\*)/g, '<em>$1</em>');
+  html = html.replace(/(?<!\*)\*(?!\*)(.*?)\*(?!\*)/g, '<em style="font-style: italic;">$1</em>');
+  
+  // Headings: # Heading, ## Heading, ### Heading
+  html = html.replace(/^### (.*$)/gm, '<h3 style="font-size: 1.17em; font-weight: bold; margin: 1em 0;">$1</h3>');
+  html = html.replace(/^## (.*$)/gm, '<h2 style="font-size: 1.5em; font-weight: bold; margin: 1em 0;">$1</h2>');
+  html = html.replace(/^# (.*$)/gm, '<h1 style="font-size: 2em; font-weight: bold; margin: 1em 0;">$1</h1>');
+  
+  // Horizontal rules: --- or ***
+  html = html.replace(/^\s*[-*]{3,}\s*$/gm, '<hr style="border: none; border-top: 1px solid #ccc; margin: 1em 0;" />');
+  
+  // Blockquotes: > text
+  html = html.replace(/^> (.*$)/gm, '<blockquote style="border-left: 4px solid #ddd; padding-left: 1em; margin: 1em 0; color: #666;">$1</blockquote>');
+  
+  // Inline code: `text`
+  html = html.replace(/`([^`]+)`/g, '<code style="background: #f4f4f4; padding: 2px 4px; border-radius: 3px; font-family: monospace;">$1</code>');
+  
+  // Links: [text](url)
+  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" style="color: #9370DB; text-decoration: underline;">$1</a>');
   
   // Lists: * item - handle consecutive list items
   const lines = html.split('\n');
@@ -24,7 +43,7 @@ const parseMarkdown = (text: string) => {
     if (line.match(/^\* /)) {
       if (!inList) {
         inList = true;
-        return '<ul><li>' + line.replace(/^\* /, '') + '</li>';
+        return '<ul style="margin: 1em 0; padding-left: 2em;"><li>' + line.replace(/^\* /, '') + '</li>';
       }
       return '<li>' + line.replace(/^\* /, '') + '</li>';
     } else {
@@ -40,8 +59,12 @@ const parseMarkdown = (text: string) => {
   }
   html = processedLines.join('\n');
   
-  // Line breaks (but not inside lists)
+  // Line breaks (but not inside lists or after block elements)
   html = html.replace(/\n(?!<)/g, '<br>');
+  
+  // Remove extra breaks after block elements
+  html = html.replace(/(<\/h[1-6]>|<\/ul>|<hr style[^>]*\/>|<\/blockquote>)<br>/g, '$1');
+  
   return html;
 };
 
@@ -56,10 +79,12 @@ export default function ChatPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [randomPrompt, setRandomPrompt] = useState<string | null>(null);
   const [waitingForPasscode, setWaitingForPasscode] = useState(false);
-  const [user, setUser] = useState<any>(null);
-  const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [adminDropdownOpen, setAdminDropdownOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [currentPath, setCurrentPath] = useState('/');
+
+  useEffect(() => {
+    setCurrentPath(window.location.pathname);
+  }, []);
 
   const currentChat = chats.find(c => c.id === currentChatId);
   const isSecretMode = currentChatId && secretModeChats.has(currentChatId);
@@ -90,7 +115,7 @@ export default function ChatPage() {
     const loadUser = () => {
       const storedUser = localStorage.getItem('user');
       if (storedUser) {
-        setUser(JSON.parse(storedUser));
+        // User is now handled by Navbar component
       }
     };
     
@@ -306,23 +331,6 @@ export default function ChatPage() {
     }
   };
 
-  const handleLogout = () => {
-    // Preserve profile data before clearing user
-    const currentUser = localStorage.getItem('user');
-    if (currentUser) {
-      const parsedUser = JSON.parse(currentUser);
-      localStorage.setItem('userProfileData', JSON.stringify({
-        name: parsedUser.name,
-        profilePicture: parsedUser.profilePicture,
-      }));
-    }
-    
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    setUser(null);
-    setDropdownOpen(false);
-  };
-
   return (
     <div className="h-screen bg-[#E8E8F0] overflow-hidden relative flex flex-col pt-16">
       {/* 3D Geometric Background */}
@@ -360,104 +368,11 @@ export default function ChatPage() {
       </div>
 
       {/* Navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-[#C8C8E0] dark:bg-dark-bg-secondary border-b border-[#A8A8C8] dark:border-dark-border flex-shrink-0">
-        <div className="px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center gap-6">
-              <button
-                className="p-2 hover:bg-[#A8A8C8] rounded-lg transition-colors"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                </svg>
-              </button>
-              {user ? (
-                <div className="relative">
-                  <button 
-                    onClick={() => setDropdownOpen(!dropdownOpen)}
-                    className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
-                  >
-                    <div className="w-8 h-8 rounded-full bg-[#9370DB] flex items-center justify-center text-white text-sm font-medium">
-                      {user.profilePicture ? (
-                        <img src={user.profilePicture} alt="Profile" className="w-full h-full rounded-full object-cover" />
-                      ) : (
-                        user.name ? user.name.charAt(0).toUpperCase() : user.email.charAt(0).toUpperCase()
-                      )}
-                    </div>
-                    <span className="text-slate-800 dark:text-dark-text text-sm">Welcome, {user.name || user.email}</span>
-                    <span className="text-slate-800 dark:text-dark-text hover:text-[#9370DB] dark:hover:text-dark-violet transition-colors text-xs ml-2 transform transition-transform duration-200">
-                      {dropdownOpen ? '▲' : '▼'}
-                    </span>
-                  </button>
-                  {dropdownOpen && (
-                    <div className="absolute top-full left-0 mt-2 bg-[#C8C8E0] dark:bg-dark-bg-secondary border border-[#A8A8C8] dark:border-dark-border rounded-lg shadow-lg py-2 w-48 z-50 animate-fade-in-down">
-                      <a href="/profile" className="block w-full text-left px-4 py-2 text-slate-800 dark:text-dark-text hover:bg-[#A8A8C8] dark:hover:bg-dark-bg-tertiary transition-colors text-sm">
-                        My Profile
-                      </a>
-                      <a href="/settings" className="block w-full text-left px-4 py-2 text-slate-800 dark:text-dark-text hover:bg-[#A8A8C8] dark:hover:bg-dark-bg-tertiary transition-colors text-sm">
-                        Settings
-                      </a>
-                      <button
-                        onClick={handleLogout}
-                        className="w-full text-left px-4 py-2 text-[#ff6b6b] hover:bg-[#ffe2e2] dark:hover:bg-[#ff5252]/20 transition-colors text-sm"
-                      >
-                        Logout
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ) : null}
-            </div>
-            <div className="flex items-center gap-6">
-              <div className="hidden md:flex items-center gap-6">
-                <a href="/" className="text-black hover:text-[#9370DB] transition-colors text-sm">
-                  Home
-                </a>
-                <a href="/explore" className="text-black hover:text-[#9370DB] transition-colors text-sm">
-                  Explore
-                </a>
-                <a href="/chat" className="text-black hover:text-[#9370DB] transition-colors text-sm">
-                  Chat
-                </a>
-                {user?.role === 'admin' && (
-                  <div 
-                    className="relative"
-                    onMouseEnter={() => setAdminDropdownOpen(true)}
-                    onMouseLeave={() => setAdminDropdownOpen(false)}
-                  >
-                    <button 
-                      className="flex items-center gap-2 text-[#9370DB] dark:text-dark-violet hover:text-[#7B68EE] dark:hover:text-dark-violet-hover transition-colors text-sm"
-                    >
-                      Admin
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                      </svg>
-                    </button>
-                    {adminDropdownOpen && (
-                      <div className="absolute top-full right-0 mt-2 bg-black border border-gray-700 rounded-lg shadow-lg py-2 w-48 z-50">
-                        <a href="/admin" className="block w-full text-left px-4 py-2 text-white hover:bg-[#9370DB] transition-colors text-sm">
-                          Universities
-                        </a>
-                        <a href="/admin" className="block w-full text-left px-4 py-2 text-white hover:bg-[#9370DB] transition-colors text-sm">
-                          Users
-                        </a>
-                        <a href="/settings" className="block w-full text-left px-4 py-2 text-white hover:bg-[#9370DB] transition-colors text-sm">
-                          Settings
-                        </a>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-              {!user && (
-                <Link href="/signup" className="px-4 py-2 bg-[#9370DB] dark:bg-dark-violet text-white rounded text-sm font-medium hover:bg-[#7B68EE] dark:hover:bg-dark-violet-hover transition-colors">
-                  Get Started
-                </Link>
-              )}
-            </div>
-          </div>
-        </div>
-      </nav>
+      <Navbar 
+        currentPage="chat" 
+        onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+        showHamburger={true}
+      />
 
       <div className="flex flex-1 overflow-hidden relative z-10">
         {/* Sidebar */}
@@ -467,9 +382,7 @@ export default function ChatPage() {
               onClick={createNewChat}
               className="w-full px-4 py-3 bg-[#9370DB] text-white rounded-lg hover:bg-[#7B68EE] transition-colors mb-4 flex items-center gap-2"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
+              <Plus className="w-5 h-5" />
               New Chat
             </button>
             {/* Search Input */}
@@ -502,9 +415,7 @@ export default function ChatPage() {
                       }}
                       className="ml-2 text-xs hover:text-red-500 transition-colors"
                     >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
+                      <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
                   <p className="text-xs opacity-70 mt-1">
@@ -580,13 +491,13 @@ export default function ChatPage() {
                 {/* Input box for custom questions */}
                 <div className="w-full max-w-2xl">
                   <div className="flex gap-2">
-                    <input
-                      type="text"
+                    <textarea
                       value={input}
                       onChange={(e) => setInput(e.target.value)}
-                      onKeyPress={handleKeyPress}
+                      onKeyDown={handleKeyPress}
                       placeholder="Or type your own question..."
-                      className="flex-1 px-4 py-3 bg-white border border-[#A8A8C8] rounded-lg text-slate-800 placeholder-slate-500 focus:outline-none focus:border-[#9370DB]"
+                      rows={1}
+                      className="flex-1 px-4 py-3 bg-white border border-[#A8A8C8] rounded-lg text-slate-800 placeholder-slate-500 focus:outline-none focus:border-[#9370DB] resize-none"
                     />
                     <button
                       onClick={sendMessage}
@@ -645,13 +556,13 @@ export default function ChatPage() {
               {/* Input */}
               <div className="p-4 bg-[#D8D8E8] border-t border-[#A8A8C8]">
                 <div className="flex gap-2 max-w-4xl mx-auto">
-                  <input
-                    type="text"
+                  <textarea
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
-                    onKeyPress={handleKeyPress}
+                    onKeyDown={handleKeyPress}
                     placeholder="Ask about universities, courses, admissions..."
-                    className="flex-1 px-4 py-3 bg-white border border-[#A8A8C8] rounded-lg text-slate-800 placeholder-slate-500 focus:outline-none focus:border-[#9370DB]"
+                    rows={1}
+                    className="flex-1 px-4 py-3 bg-white border border-[#A8A8C8] rounded-lg text-slate-800 placeholder-slate-500 focus:outline-none focus:border-[#9370DB] resize-none"
                   />
                   <button
                     onClick={sendMessage}

@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Navbar from '../../components/Navbar';
+import { Bookmark, ChevronLeft } from 'lucide-react';
 
 const regionData: Record<string, { id: number; name: string; location: string; description: string; province: string; image: string }[]> = {
   'North America': [
@@ -38,9 +40,11 @@ const regionData: Record<string, { id: number; name: string; location: string; d
 };
 
 export default function Explore() {
-  const [user, setUser] = useState<any>(null);
-  const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [adminDropdownOpen, setAdminDropdownOpen] = useState(false);
+  const [currentPath, setCurrentPath] = useState('/');
+
+  useEffect(() => {
+    setCurrentPath(window.location.pathname);
+  }, []);
   const [selectedRegion, setSelectedRegion] = useState<string>('North America');
   const [selectedProvince, setSelectedProvince] = useState<string>('All');
   const [selectedUni, setSelectedUni] = useState<any>(null);
@@ -53,15 +57,6 @@ export default function Explore() {
   const [savedUniversities, setSavedUniversities] = useState<any[]>([]);
 
   useEffect(() => {
-    const loadUser = () => {
-      const storedUser = localStorage.getItem('user');
-      if (storedUser) {
-        setUser(JSON.parse(storedUser));
-      }
-    };
-    
-    loadUser();
-    
     // Load user preferences
     const storedPreferences = localStorage.getItem('userPreferences');
     if (storedPreferences) {
@@ -73,23 +68,6 @@ export default function Explore() {
     if (saved) {
       setSavedUniversities(JSON.parse(saved));
     }
-    
-    // Update user when localStorage changes
-    const handleStorageChange = () => {
-      loadUser();
-    };
-    
-    // Update user when custom login event is dispatched
-    const handleUserUpdate = () => {
-      loadUser();
-    };
-
-    window.addEventListener('storage', handleStorageChange);
-    window.addEventListener('userLogin', handleUserUpdate);
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('userLogin', handleUserUpdate);
-    };
   }, []);
 
   useEffect(() => {
@@ -101,23 +79,6 @@ export default function Explore() {
     }, 4000);
     return () => clearInterval(interval);
   }, [selectedRegion, selectedProvince]);
-
-  const handleLogout = () => {
-    // Preserve profile data before clearing user
-    const currentUser = localStorage.getItem('user');
-    if (currentUser) {
-      const parsedUser = JSON.parse(currentUser);
-      localStorage.setItem('userProfileData', JSON.stringify({
-        name: parsedUser.name,
-        profilePicture: parsedUser.profilePicture,
-      }));
-    }
-    
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    setUser(null);
-    setDropdownOpen(false);
-  };
 
   const handleUniClick = (uni: any) => {
     setSelectedUni(uni);
@@ -199,92 +160,7 @@ export default function Explore() {
   return (
     <div className="min-h-screen bg-[#E8E8F0] dark:bg-dark-bg">
       {/* Navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-[#C8C8E0] dark:bg-dark-bg-secondary border-b border-[#A8A8C8] dark:border-dark-border">
-        <div className="px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center gap-6">
-              {user ? (
-                <div className="relative">
-                  <button 
-                    onClick={() => setDropdownOpen(!dropdownOpen)}
-                    className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
-                  >
-                    <div className="w-8 h-8 rounded-full bg-[#9370DB] flex items-center justify-center text-white text-sm font-medium">
-                      {user.profilePicture ? (
-                        <img src={user.profilePicture} alt="Profile" className="w-full h-full rounded-full object-cover" />
-                      ) : (
-                        user.name ? user.name.charAt(0).toUpperCase() : user.email.charAt(0).toUpperCase()
-                      )}
-                    </div>
-                    <span className="text-slate-800 dark:text-dark-text text-sm">Welcome, {user.name || user.email}</span>
-                    <span className="text-slate-800 dark:text-dark-text hover:text-[#9370DB] dark:hover:text-dark-violet transition-colors text-xs ml-2 transform transition-transform duration-200">
-                      {dropdownOpen ? '▲' : '▼'}
-                    </span>
-                  </button>
-                  {dropdownOpen && (
-                    <div className="absolute top-full left-0 mt-2 bg-[#C8C8E0] dark:bg-dark-bg-secondary border border-[#A8A8C8] dark:border-dark-border rounded-lg shadow-lg py-2 w-48 z-50 animate-fade-in-down">
-                      <a href="/profile" className="block w-full text-left px-4 py-2 text-slate-800 dark:text-dark-text hover:bg-[#A8A8C8] dark:hover:bg-dark-bg-tertiary transition-colors text-sm">
-                        My Profile
-                      </a>
-                      <a href="/settings" className="block w-full text-left px-4 py-2 text-slate-800 dark:text-dark-text hover:bg-[#A8A8C8] dark:hover:bg-dark-bg-tertiary transition-colors text-sm">
-                        Settings
-                      </a>
-                      <button
-                        onClick={handleLogout}
-                        className="w-full text-left px-4 py-2 text-[#ff6b6b] hover:bg-[#ffe2e2] dark:hover:bg-[#ff5252]/20 transition-colors text-sm"
-                      >
-                        Logout
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ) : null}
-            </div>
-            <div className="flex items-center gap-6">
-              <div className="hidden md:flex items-center gap-6">
-                <a href="/" className="text-black hover:text-[#9370DB] transition-colors text-sm">
-                  Home
-                </a>
-                <a href="/explore" className="text-black hover:text-[#9370DB] transition-colors text-sm">
-                  Explore
-                </a>
-                <a href="/chat" className="text-black hover:text-[#9370DB] transition-colors text-sm">
-                  Chat
-                </a>
-                {user?.role === 'admin' && (
-                  <div 
-                    className="relative"
-                    onMouseEnter={() => setAdminDropdownOpen(true)}
-                    onMouseLeave={() => setAdminDropdownOpen(false)}
-                  >
-                    <button 
-                      className="flex items-center gap-2 text-[#9370DB] dark:text-dark-violet hover:text-[#7B68EE] dark:hover:text-dark-violet-hover transition-colors text-sm"
-                    >
-                      Admin
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                      </svg>
-                    </button>
-                    {adminDropdownOpen && (
-                      <div className="absolute top-full right-0 mt-2 bg-black border border-gray-700 rounded-lg shadow-lg py-2 w-48 z-50">
-                        <a href="/admin" className="block w-full text-left px-4 py-2 text-white hover:bg-[#9370DB] transition-colors text-sm">
-                          Universities
-                        </a>
-                        <a href="/admin" className="block w-full text-left px-4 py-2 text-white hover:bg-[#9370DB] transition-colors text-sm">
-                          Users
-                        </a>
-                        <a href="/settings" className="block w-full text-left px-4 py-2 text-white hover:bg-[#9370DB] transition-colors text-sm">
-                          Settings
-                        </a>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      </nav>
+      <Navbar currentPage="explore" />
 
       {/* Explore Section */}
       <section className="pt-16 h-screen overflow-hidden">
@@ -409,9 +285,7 @@ export default function Explore() {
                         : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400'
                     }`}
                   >
-                    <svg className="w-6 h-6" fill={isUniversitySaved(uni.id) ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
-                    </svg>
+                    <Bookmark className="w-6 h-6" fill={isUniversitySaved(uni.id) ? 'currentColor' : 'none'} />
                   </button>
                 </div>
               ))}
@@ -426,9 +300,7 @@ export default function Explore() {
                   onClick={() => setSelectedUni(null)}
                   className="text-slate-800 dark:text-dark-text hover:text-[#9370DB] dark:hover:text-dark-violet transition-colors flex items-center gap-2"
                 >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                  </svg>
+                  <ChevronLeft className="w-5 h-5" />
                   Back
                 </button>
                 <button
@@ -439,9 +311,7 @@ export default function Explore() {
                       : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400'
                   }`}
                 >
-                  <svg className="w-6 h-6" fill={isUniversitySaved(selectedUni.id) ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
-                  </svg>
+                  <Bookmark className="w-6 h-6" fill={isUniversitySaved(selectedUni.id) ? 'currentColor' : 'none'} />
                 </button>
               </div>
               <div className="w-full h-64 bg-white dark:bg-dark-bg-tertiary rounded-lg mb-4 flex items-center justify-center overflow-hidden">
