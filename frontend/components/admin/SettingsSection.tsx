@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Settings, GraduationCap, CheckCircle2, Upload, X } from 'lucide-react';
+import ImageCropper from '@/components/ImageCropper';
 
 const cardCls =
   'bg-white dark:bg-dark-bg-secondary border border-[#E2E0F0] dark:border-dark-border rounded-xl shadow-sm';
@@ -22,8 +23,6 @@ export function applyAppBranding(appName: string, appIcon: string) {
   }
 }
 
-const CROP_SIZE = 280;
-const OUT_SIZE = 256;
 
 export default function SettingsSection() {
   const fileRef = useRef<HTMLInputElement>(null);
@@ -33,8 +32,8 @@ export default function SettingsSection() {
   const [saving, setSaving] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
 
-  // Crop state
-  const [crop, setCrop] = useState<null | { src: string; zoom: number; img: HTMLImageElement }>(null);
+  // Crop state (source image data URL / object URL while the cropper is open)
+  const [cropSrc, setCropSrc] = useState<string | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -55,34 +54,12 @@ export default function SettingsSection() {
   }, []);
 
   const handleFile = (file: File) => {
-    const url = URL.createObjectURL(file);
-    const img = new Image();
-    img.onload = () => {
-      setCrop({ src: url, zoom: 1, img });
-    };
-    img.src = url;
+    setCropSrc(URL.createObjectURL(file));
   };
 
-  const applyCrop = () => {
-    if (!crop) return;
-    const { img, zoom } = crop;
-    const dw = CROP_SIZE * zoom; // display width of the img
-    const scale = img.naturalWidth / dw;
-    const sw = CROP_SIZE * scale;
-    const sh = CROP_SIZE * scale;
-    const sx = (img.naturalWidth - sw) / 2;
-    const sy = (img.naturalHeight - sh) / 2;
-    const canvas = document.createElement('canvas');
-    canvas.width = OUT_SIZE;
-    canvas.height = OUT_SIZE;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(img, sx, sy, sw, sh, 0, 0, OUT_SIZE, OUT_SIZE);
-    setAppIcon(canvas.toDataURL('image/png'));
-    URL.revokeObjectURL(crop.src);
-    setCrop(null);
-    setFlash('Icon cropped — hit Save Settings to apply it');
+  const closeCropper = () => {
+    if (cropSrc) URL.revokeObjectURL(cropSrc);
+    setCropSrc(null);
   };
 
   const handleSave = async () => {
@@ -217,100 +194,19 @@ export default function SettingsSection() {
       </div>
 
       {/* Crop modal */}
-      {crop && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
-          <div className={`${cardCls} p-6 max-w-md w-full animate-scale-in`}>
-            <div className="flex items-center justify-between mb-5">
-              <h3 className="text-lg font-bold text-slate-900 dark:text-dark-text">Crop Icon</h3>
-              <button
-                onClick={() => {
-                  URL.revokeObjectURL(crop.src);
-                  setCrop(null);
-                }}
-                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-[#F4F2FA] dark:hover:bg-dark-bg-tertiary rounded-lg transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="flex items-center justify-center gap-6">
-              {/* Crop area */}
-              <div
-                className="rounded-2xl overflow-hidden border-4 border-[#9370DB] shadow-lg relative bg-[#F4F2FA]"
-                style={{ width: CROP_SIZE, height: CROP_SIZE }}
-              >
-                <img
-                  src={crop.src}
-                  alt="Crop"
-                  className="absolute top-1/2 left-1/2"
-                  style={{
-                    width: CROP_SIZE * crop.zoom,
-                    transform: 'translate(-50%, -50%)',
-                    maxWidth: 'none',
-                  }}
-                />
-              </div>
-
-              {/* Preview */}
-              <div className="text-center">
-                <div
-                  className="rounded-xl overflow-hidden mx-auto mb-2"
-                  style={{ width: 72, height: 72 }}
-                >
-                  <div style={{ width: 72 * crop.zoom, transform: 'scale(1)', position: 'relative' }}>
-                    <img
-                      src={crop.src}
-                      alt="Preview"
-                      className="max-w-none"
-                      style={{
-                        width: 72 * crop.zoom,
-                        transform: 'translateX(-50%)',
-                        marginLeft: '50%',
-                        marginTop: -((72 * crop.zoom - 72) / 2),
-                      }}
-                    />
-                  </div>
-                </div>
-                <p className="text-xs text-slate-500 dark:text-dark-text-secondary">Preview</p>
-              </div>
-            </div>
-
-            <div className="mt-6 space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-slate-600 dark:text-dark-text-secondary">Zoom</span>
-                <span className="text-slate-900 dark:text-dark-text font-medium">{crop.zoom.toFixed(1)}×</span>
-              </div>
-              <input
-                type="range"
-                min={1}
-                max={4}
-                step={0.1}
-                value={crop.zoom}
-                onChange={(e) => setCrop({ ...crop, zoom: Number(e.target.value) })}
-                className="w-full accent-[#9370DB]"
-              />
-            </div>
-
-            <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-[#F0EEF8] dark:border-dark-border">
-              <button
-                onClick={() => {
-                  URL.revokeObjectURL(crop.src);
-                  setCrop(null);
-                }}
-                className="px-5 py-2.5 text-slate-600 dark:text-dark-text-secondary hover:bg-[#F4F2FA] dark:hover:bg-dark-bg-tertiary rounded-lg font-medium transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={applyCrop}
-                className="px-5 py-2.5 bg-[#9370DB] text-white rounded-lg font-medium hover:bg-[#7B68EE] transition-colors shadow-sm shadow-[#9370DB]/30"
-              >
-                Crop & Save
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ImageCropper
+        open={!!cropSrc}
+        imageSrc={cropSrc || ''}
+        title="Crop App Icon"
+        size={280}
+        outputSize={256}
+        onCancel={closeCropper}
+        onConfirm={(dataUrl) => {
+          setAppIcon(dataUrl);
+          closeCropper();
+          setFlash('Icon cropped — hit Save Settings to apply it');
+        }}
+      />
     </div>
   );
 }

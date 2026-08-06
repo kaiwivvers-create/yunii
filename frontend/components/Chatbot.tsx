@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import { MessageSquare, Send, X } from 'lucide-react';
 import LoginModal from './LoginModal';
+import { loadUserData } from '@/utils/userStorage';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 const parseMarkdown = (text: string) => {
   // Bold: **text**
@@ -61,6 +63,7 @@ const parseMarkdown = (text: string) => {
 };
 
 export default function Chatbot() {
+  const { t } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
   const [message, setMessage] = useState('');
   const [chatHistory, setChatHistory] = useState<Array<{role: 'user' | 'assistant', content: string}>>([]);
@@ -113,15 +116,15 @@ export default function Chatbot() {
       context += `Page: Explore page - Browsing universities by region and province\n`;
       
       // Add selected university context
-      const selectedUniversity = localStorage.getItem('selectedUniversity');
+      const selectedUniversity = loadUserData<any>('selectedUniversity', null);
       if (selectedUniversity) {
-        const uni = JSON.parse(selectedUniversity);
+        const uni = selectedUniversity;
         context += `Selected university: ${uni.name} - ${uni.location}\n`;
         context += `Description: ${uni.description}\n`;
         context += `User is viewing this university in the side panel. Tell them to click 'See More' for detailed information about this university.\n`;
       }
       
-      const storedPreferences = localStorage.getItem('userPreferences');
+      const storedPreferences = loadUserData<any>('userPreferences', null);
       if (storedPreferences) {
         const preferences = JSON.parse(storedPreferences);
         context += `User preferences:\n`;
@@ -137,14 +140,13 @@ export default function Chatbot() {
       context += `User is looking at detailed information about this university\n`;
     } else if (pathname === '/chat') {
       context += `Page: Chat page - AI conversation interface for university-related questions\n`;
-      const storedChats = localStorage.getItem('chats');
-      if (storedChats) {
-        const chats = JSON.parse(storedChats);
-        context += `User has ${chats.length} existing chat conversations\n`;
+      const storedChats = loadUserData<any[]>('chats', []);
+      if (storedChats.length > 0) {
+        context += `User has ${storedChats.length} existing chat conversations\n`;
       }
     } else if (pathname === '/settings') {
       context += `Page: Settings page - User can update preferences and app settings\n`;
-      const storedPreferences = localStorage.getItem('userPreferences');
+      const storedPreferences = loadUserData<any>('userPreferences', null);
       if (storedPreferences) {
         context += `User has saved preferences\n`;
       }
@@ -178,10 +180,10 @@ export default function Chatbot() {
         const data = await response.json();
         setChatHistory([...newHistory, { role: 'assistant' as const, content: data.response }]);
       } else {
-        setChatHistory([...newHistory, { role: 'assistant' as const, content: 'Sorry, I encountered an error. Please try again.' }]);
+        setChatHistory([...newHistory, { role: 'assistant' as const, content: t('chatError') }]);
       }
     } catch (error) {
-      setChatHistory([...newHistory, { role: 'assistant' as const, content: 'Sorry, I encountered an error. Please try again.' }]);
+      setChatHistory([...newHistory, { role: 'assistant' as const, content: t('chatError') }]);
     } finally {
       setIsLoading(false);
     }
@@ -205,7 +207,7 @@ export default function Chatbot() {
       ) : (
         <div className="w-96 h-[500px] bg-[#C8C8E0] dark:bg-dark-bg-secondary border border-[#A8A8C8] dark:border-dark-border rounded-lg shadow-2xl flex flex-col">
           <div className="p-4 border-b border-[#A8A8C8] dark:border-dark-border flex justify-between items-center">
-            <h3 className="font-semibold text-slate-900 dark:text-dark-text">AI Assistant</h3>
+            <h3 className="font-semibold text-slate-900 dark:text-dark-text">{t('aiAssistant')}</h3>
             <button
               onClick={() => setIsOpen(false)}
               className="text-slate-800 dark:text-dark-text hover:text-[#9370DB] dark:hover:text-dark-violet transition-colors"
@@ -216,15 +218,15 @@ export default function Chatbot() {
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             {chatHistory.length === 0 && (
               <div className="text-center text-slate-600 dark:text-dark-text-secondary py-8">
-                <p className="mb-2">Hi! I'm your UniVerse AI assistant.</p>
+                <p className="mb-2">{t('aiWelcome')}</p>
                 <p className="text-sm">
                   {pathname.startsWith('/university/')
-                    ? 'I can answer questions about this university, its programs, admissions, and help you compare it with other options.'
+                    ? t('aiWelcomeUni')
                     : pathname === '/explore'
-                    ? 'I can help you find universities based on your preferences, answer questions about specific universities, or give advice on your study choices.'
+                    ? t('aiWelcomeExplore')
                     : pathname === '/chat'
-                    ? 'I can help you with university-related questions, program information, admissions advice, and more.'
-                    : 'I can help you navigate the app, find universities, and answer questions about studying abroad.'}
+                    ? t('aiWelcomeChat')
+                    : t('aiWelcomeDefault')}
                 </p>
               </div>
             )}
@@ -267,7 +269,7 @@ export default function Chatbot() {
                     handleSendMessage();
                   }
                 }}
-                placeholder="Type your message..."
+                placeholder={t('typeYourMessage')}
                 rows={1}
                 className="flex-1 px-3 py-2 bg-[#E8E8F0] dark:bg-dark-bg-tertiary border border-[#A8A8C8] dark:border-dark-border rounded-lg text-slate-900 dark:text-dark-text placeholder-slate-500 dark:placeholder-dark-text-secondary focus:outline-none focus:border-[#9370DB] dark:focus:border-dark-violet resize-none"
               />

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import Navbar from '../../../components/Navbar';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { loadUserData, saveUserData } from '@/utils/userStorage';
 import {
   ChevronDown,
   ChevronUp,
@@ -390,27 +391,21 @@ export default function UniversityPage() {
   }, [universityName]);
 
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem('compareList');
-      if (stored && university) {
-        setInCompare(JSON.parse(stored).includes(university.id));
-      }
-    } catch {}
+    if (university) {
+      const list = loadUserData<number[]>('compareList', []);
+      setInCompare(list.includes(university.id));
+    }
   }, [university]);
 
   const toggleCompare = () => {
     if (!university) return;
-    let list: number[] = [];
-    try {
-      const stored = localStorage.getItem('compareList');
-      if (stored) list = JSON.parse(stored);
-    } catch {}
+    let list = loadUserData<number[]>('compareList', []);
     if (list.includes(university.id)) {
       list = list.filter((id) => id !== university.id);
     } else {
       list = [...list, university.id].slice(-4);
     }
-    localStorage.setItem('compareList', JSON.stringify(list));
+    saveUserData('compareList', list);
     setInCompare(list.includes(university.id));
   };
 
@@ -560,7 +555,7 @@ export default function UniversityPage() {
                     <div key={program} className="flex items-center justify-between bg-[#E8E8F0] border border-[#A8A8C8] rounded-lg px-4 py-2.5">
                       <span className="text-slate-800">{program}</span>
                       <span className="px-2.5 py-1 bg-[#9370DB]/10 text-[#9370DB] rounded-full text-sm font-semibold">
-                        #{rank} {lang === 'zh' ? '名' : ''}
+                        #{String(rank)} {lang === 'zh' ? '名' : ''}
                       </span>
                     </div>
                   ))}

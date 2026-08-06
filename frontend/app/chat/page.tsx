@@ -5,7 +5,9 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Navbar from '../../components/Navbar';
 import LoginModal from '@/components/LoginModal';
+import { loadUserData, saveUserData, removeUserData } from '@/utils/userStorage';
 import { Plus, Trash2 } from 'lucide-react';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface Chat {
   id: string;
@@ -71,6 +73,7 @@ const parseMarkdown = (text: string) => {
 
 export default function ChatPage() {
   const router = useRouter();
+  const { t } = useLanguage();
   const [chats, setChats] = useState<Chat[]>([]);
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const [secretModeChats, setSecretModeChats] = useState<Set<string>>(new Set());
@@ -84,6 +87,8 @@ export default function ChatPage() {
   const [currentPath, setCurrentPath] = useState('/');
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
+  const [usePreferences, setUsePreferences] = useState(false);
+  const [userPreferences, setUserPreferences] = useState<any>(null);
 
   useEffect(() => {
     const checkLogin = () => setIsLoggedIn(!!localStorage.getItem('user'));
@@ -94,6 +99,14 @@ export default function ChatPage() {
       window.removeEventListener('storage', checkLogin);
       window.removeEventListener('userLogin', checkLogin);
     };
+  }, []);
+
+  useEffect(() => {
+    // Load user preferences
+    const storedPreferences = localStorage.getItem('userPreferences');
+    if (storedPreferences) {
+      setUserPreferences(JSON.parse(storedPreferences));
+    }
   }, []);
 
   useEffect(() => {
@@ -111,19 +124,19 @@ export default function ChatPage() {
 
   // Load data from localStorage after mount
   useEffect(() => {
-    const savedChats = localStorage.getItem('chats');
-    const savedCurrentChatId = localStorage.getItem('currentChatId');
-    const savedSecretModeChats = localStorage.getItem('secretModeChats');
+    const savedChats = loadUserData<any[] | null>('chats', null);
+    const savedCurrentChatId = loadUserData<string | null>('currentChatId', null);
+    const savedSecretModeChats = loadUserData<string[]>('secretModeChats', []);
     const storedUser = localStorage.getItem('user');
     
     if (savedChats) {
-      setChats(JSON.parse(savedChats));
+      setChats(savedChats);
     }
     if (savedCurrentChatId) {
       setCurrentChatId(savedCurrentChatId);
     }
-    if (savedSecretModeChats) {
-      setSecretModeChats(new Set(JSON.parse(savedSecretModeChats)));
+    if (savedSecretModeChats.length) {
+      setSecretModeChats(new Set(savedSecretModeChats));
     }
 
     const loadUser = () => {
@@ -162,19 +175,19 @@ export default function ChatPage() {
 
   // Save data to localStorage
   useEffect(() => {
-    localStorage.setItem('chats', JSON.stringify(chats));
+    saveUserData('chats', chats);
   }, [chats]);
 
   useEffect(() => {
     if (currentChatId) {
-      localStorage.setItem('currentChatId', currentChatId);
+      saveUserData('currentChatId', currentChatId);
     } else {
-      localStorage.removeItem('currentChatId');
+      removeUserData('currentChatId');
     }
   }, [currentChatId]);
 
   useEffect(() => {
-    localStorage.setItem('secretModeChats', JSON.stringify(Array.from(secretModeChats)));
+    saveUserData('secretModeChats', Array.from(secretModeChats));
   }, [secretModeChats]);
 
   useEffect(() => {
@@ -301,7 +314,9 @@ export default function ChatPage() {
           message: userMessage, 
           history: chats.find(c => c.id === chatId)?.messages || [],
           isNewChat: !currentChatId,
-          secretMode: isSecretMode
+          secretMode: isSecretMode,
+          usePreferences: usePreferences,
+          userPreferences: usePreferences ? userPreferences : null
         }),
       });
 
@@ -322,7 +337,7 @@ export default function ChatPage() {
           if (chat.id === chatId) {
             return {
               ...chat,
-              messages: [...chat.messages, { role: 'assistant' as const, content: 'Sorry, I encountered an error. Please try again.' }],
+              messages: [...chat.messages, { role: 'assistant' as const, content: t('chatError') }],
             };
           }
           return chat;
@@ -333,7 +348,7 @@ export default function ChatPage() {
         if (chat.id === chatId) {
           return {
             ...chat,
-            messages: [...chat.messages, { role: 'assistant' as const, content: 'Sorry, I encountered an error. Please try again.' }],
+            messages: [...chat.messages, { role: 'assistant' as const, content: t('chatError') }],
           };
         }
         return chat;
@@ -402,7 +417,7 @@ export default function ChatPage() {
               className="w-full px-4 py-3 bg-[#9370DB] text-white rounded-lg hover:bg-[#7B68EE] transition-colors mb-4 flex items-center gap-2"
             >
               <Plus className="w-5 h-5" />
-              New Chat
+              {t('newChat')}
             </button>
             {/* Search Input */}
             <div className="mb-4">
@@ -410,7 +425,7 @@ export default function ChatPage() {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search chats..."
+                placeholder={t('searchChats')}
                 className="w-full px-3 py-2 bg-[#E8E8F0] border border-[#A8A8C8] rounded-lg text-slate-800 placeholder-slate-500 text-sm focus:outline-none focus:border-[#9370DB]"
               />
             </div>
@@ -454,18 +469,18 @@ export default function ChatPage() {
                 {!isLoggedIn && (
                   <div className="mb-6 p-4 bg-[#9370DB]/10 border border-[#9370DB] rounded-lg flex items-center justify-between gap-4">
                     <p className="text-slate-800 font-medium text-sm">
-                      Sign in to start chatting with the AI assistant
+                      {t('signInToStartChatting')}
                     </p>
                     <button
                       onClick={() => setShowLogin(true)}
                       className="px-4 py-2 bg-[#9370DB] text-white rounded-lg font-medium hover:bg-[#7B68EE] transition-colors text-sm whitespace-nowrap"
                     >
-                      Sign In
+                      {t('signIn')}
                     </button>
                   </div>
                 )}
-                <h2 className="text-3xl font-bold text-slate-800 mb-2">How can I help you today?</h2>
-                <p className="text-slate-600 mb-8">I can help you find universities, explore courses, and navigate your academic journey.</p>
+                <h2 className="text-3xl font-bold text-slate-800 mb-2">{t('howCanIHelp')}</h2>
+                <p className="text-slate-600 mb-8">{t('chatSubtitle')}</p>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
                   {randomPrompt ? (
@@ -482,39 +497,39 @@ export default function ChatPage() {
                     <>
                       <button
                         onClick={() => { 
-                          setInput('What are the top universities for computer science?');
+                          setInput(t('promptCS'));
                           sendMessage();
                         }}
                         className="p-4 bg-white border border-[#A8A8C8] rounded-lg hover:border-[#9370DB] hover:shadow-md transition-all text-left animate-rise-in"
                       >
-                        <p className="text-slate-800 font-medium">What are the top universities for computer science?</p>
+                        <p className="text-slate-800 font-medium">{t('promptCS')}</p>
                       </button>
                       <button
                         onClick={() => { 
-                          setInput('How do I write a strong college application essay?');
+                          setInput(t('promptEssay'));
                           sendMessage();
                         }}
                         className="p-4 bg-white border border-[#A8A8C8] rounded-lg hover:border-[#9370DB] hover:shadow-md transition-all text-left animate-rise-in-1"
                       >
-                        <p className="text-slate-800 font-medium">How do I write a strong college application essay?</p>
+                        <p className="text-slate-800 font-medium">{t('promptEssay')}</p>
                       </button>
                       <button
                         onClick={() => { 
-                          setInput('What scholarships are available for international students?');
+                          setInput(t('promptScholarships'));
                           sendMessage();
                         }}
                         className="p-4 bg-white border border-[#A8A8C8] rounded-lg hover:border-[#9370DB] hover:shadow-md transition-all text-left animate-rise-in-2"
                       >
-                        <p className="text-slate-800 font-medium">What scholarships are available for international students?</p>
+                        <p className="text-slate-800 font-medium">{t('promptScholarships')}</p>
                       </button>
                       <button
                         onClick={() => { 
-                          setInput('What should I consider when choosing a major?');
+                          setInput(t('promptMajor'));
                           sendMessage();
                         }}
                         className="p-4 bg-white border border-[#A8A8C8] rounded-lg hover:border-[#9370DB] hover:shadow-md transition-all text-left animate-rise-in-3"
                       >
-                        <p className="text-slate-800 font-medium">What should I consider when choosing a major?</p>
+                        <p className="text-slate-800 font-medium">{t('promptMajor')}</p>
                       </button>
                     </>
                   )}
@@ -527,7 +542,7 @@ export default function ChatPage() {
                       value={input}
                       onChange={(e) => setInput(e.target.value)}
                       onKeyDown={handleKeyPress}
-                      placeholder="Or type your own question..."
+                      placeholder={t('typeYourOwnQuestion')}
                       rows={1}
                       className="flex-1 px-4 py-3 bg-white border border-[#A8A8C8] rounded-lg text-slate-800 placeholder-slate-500 focus:outline-none focus:border-[#9370DB] resize-none"
                     />
@@ -536,7 +551,7 @@ export default function ChatPage() {
                       disabled={!input.trim()}
                       className="px-6 py-3 bg-[#9370DB] text-white rounded-lg hover:bg-[#7B68EE] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      Send
+                      {t('send')}
                     </button>
                   </div>
                 </div>
@@ -548,7 +563,7 @@ export default function ChatPage() {
               <div className="flex-1 overflow-y-auto p-4 space-y-4">
                 {currentChat.messages.length === 0 ? (
                   <div className="flex items-center justify-center h-full">
-                    <p className="text-slate-600">Start a conversation by typing a message below.</p>
+                    <p className="text-slate-600">{t('startConversation')}</p>
                   </div>
                 ) : (
                   currentChat.messages.map((message, index) => (
@@ -578,7 +593,7 @@ export default function ChatPage() {
                 {isLoading && (
                   <div className="flex justify-start">
                     <div className="bg-white text-slate-800 border border-[#A8A8C8] rounded-lg p-4">
-                      <p>Thinking...</p>
+                      <p>{t('thinking')}</p>
                     </div>
                   </div>
                 )}
@@ -586,13 +601,31 @@ export default function ChatPage() {
               </div>
 
               {/* Input */}
-              <div className="p-4 bg-[#D8D8E8] border-t border-[#A8A8C8]">
+              <div className="p-4 border-t border-[#A8A8C8]">
+                {/* Preference Toggle */}
+                <div className="mb-3 flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="usePreferences"
+                    checked={usePreferences}
+                    onChange={(e) => setUsePreferences(e.target.checked)}
+                    className="w-4 h-4 accent-[#9370DB]"
+                  />
+                  <label htmlFor="usePreferences" className="text-sm text-slate-800 cursor-pointer">
+                    {t('basedOnMyPreferences')}
+                  </label>
+                  {usePreferences && !userPreferences && (
+                    <span className="text-xs text-slate-500 ml-2">
+                      {t('noPreferencesSet')}
+                    </span>
+                  )}
+                </div>
                 <div className="flex gap-2 max-w-4xl mx-auto">
                   <textarea
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     onKeyDown={handleKeyPress}
-                    placeholder="Ask about universities, courses, admissions..."
+                    placeholder={t('askAbout')}
                     rows={1}
                     className="flex-1 px-4 py-3 bg-white border border-[#A8A8C8] rounded-lg text-slate-800 placeholder-slate-500 focus:outline-none focus:border-[#9370DB] resize-none"
                   />
@@ -601,7 +634,7 @@ export default function ChatPage() {
                     disabled={isLoading || !input.trim()}
                     className="px-6 py-3 bg-[#9370DB] text-white rounded-lg hover:bg-[#7B68EE] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Send
+                    {t('send')}
                   </button>
                 </div>
               </div>

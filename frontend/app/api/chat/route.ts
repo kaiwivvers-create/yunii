@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(request: NextRequest) {
   try {
-    const { message, history, isNewChat, secretMode, context } = await request.json();
+    const { message, history, isNewChat, secretMode, context, usePreferences, userPreferences } = await request.json();
 
     // Google Gemini API endpoint
     const apiKey = process.env.GEMINI_API_KEY;
@@ -31,6 +31,47 @@ If a user asks about anything outside these topics (medical advice, legal advice
     // Add context to system prompt if provided
     if (context) {
       systemPrompt += `\n\nContext about the current situation:\n${context}\n\nUse this context to provide relevant answers based on the user's current page and preferences.`;
+    }
+
+    // Add user preferences to system prompt if enabled
+    if (usePreferences && userPreferences) {
+      let preferencesContext = '\n\nUser Preferences:\n';
+      
+      if (userPreferences.intendedMajor && userPreferences.intendedMajor.length > 0) {
+        preferencesContext += `- Intended Majors: ${userPreferences.intendedMajor.join(', ')}\n`;
+      }
+      
+      if (userPreferences.degreeLevel) {
+        preferencesContext += `- Degree Level: ${userPreferences.degreeLevel}\n`;
+      }
+      
+      if (userPreferences.preferredRegions && userPreferences.preferredRegions.length > 0) {
+        preferencesContext += `- Preferred Regions: ${userPreferences.preferredRegions.join(', ')}\n`;
+      }
+      
+      if (userPreferences.preferredCountries && userPreferences.preferredCountries.length > 0) {
+        preferencesContext += `- Preferred Countries: ${userPreferences.preferredCountries.join(', ')}\n`;
+      }
+      
+      if (userPreferences.budget) {
+        preferencesContext += `- Budget: ${userPreferences.budget}\n`;
+      }
+      
+      if (userPreferences.gpa) {
+        preferencesContext += `- GPA: ${userPreferences.gpa}\n`;
+      }
+      
+      if (userPreferences.studyMode) {
+        preferencesContext += `- Study Mode: ${userPreferences.studyMode}\n`;
+      }
+      
+      if (userPreferences.startDate) {
+        preferencesContext += `- Start Date: ${userPreferences.startDate}\n`;
+      }
+      
+      preferencesContext += '\nWhen answering questions about universities, courses, or academic advice, prioritize recommendations that align with these preferences. Tailor your responses to the user\'s specific goals and constraints.';
+      
+      systemPrompt += preferencesContext;
     }
 
     // Build conversation history for context

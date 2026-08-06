@@ -6,6 +6,7 @@ import { useParams } from 'next/navigation';
 import Navbar from '../../../components/Navbar';
 import LoginModal from '@/components/LoginModal';
 import { ChevronLeft } from 'lucide-react';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 const regionData: Record<string, { name: string; location: string; description: string; province: string; image: string }[]> = {
   'north-america': [
@@ -51,6 +52,7 @@ const regionNames: Record<string, string> = {
 };
 
 export default function RegionPage() {
+  const { t } = useLanguage();
   const params = useParams();
   const region = params.region as string;
   const [user, setUser] = useState<any>(null);
@@ -78,6 +80,7 @@ export default function RegionPage() {
     if (currentUser) {
       const parsedUser = JSON.parse(currentUser);
       localStorage.setItem('userProfileData', JSON.stringify({
+        email: parsedUser.email,
         name: parsedUser.name,
         profilePicture: parsedUser.profilePicture,
       }));
@@ -121,12 +124,12 @@ export default function RegionPage() {
           <div className="mb-8">
             <Link href="/explore" className="inline-flex items-center gap-1.5 text-[#9370DB] hover:underline text-sm">
               <ChevronLeft className="w-4 h-4" />
-              Back to regions
+              {t('backToRegions')}
             </Link>
           </div>
           
           <h1 className="text-3xl font-bold text-slate-900 mb-8">
-            Universities in {regionName}
+            {t('universitiesIn', { region: regionName })}
           </h1>
 
           <div className="flex gap-8">
@@ -146,14 +149,14 @@ export default function RegionPage() {
               </div>
 
               {getFilteredUniversities().length === 0 && (
-                <p className="text-slate-800">No universities found for this region.</p>
+                <p className="text-slate-800">{t('noUniversitiesFoundForRegion')}</p>
               )}
             </div>
 
             {/* Right side - Provinces */}
             <div className="w-64">
               <h2 className="text-xl font-semibold text-slate-900 mb-4">
-                Provinces in {regionName}
+                {t('provincesIn', { region: regionName })}
               </h2>
               <div className="space-y-2">
                 {getProvinces().map((province) => (
@@ -192,14 +195,14 @@ export default function RegionPage() {
                 onClick={() => setModalOpen(false)}
                 className="px-4 py-2 border border-[#A8A8C8] text-slate-900 rounded hover:bg-[#A8A8C8] transition-colors"
               >
-                Close
+                {t('close')}
               </button>
               <Link
                 href={`/university/${selectedUni.name.toLowerCase().replace(/\s+/g, '-')}`}
                 className="px-4 py-2 bg-[#9370DB] text-white rounded hover:bg-[#7B68EE] transition-colors"
                 onClick={() => setModalOpen(false)}
               >
-                See More
+                {t('seeMore')}
               </Link>
             </div>
           </div>

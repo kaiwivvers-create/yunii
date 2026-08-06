@@ -4,8 +4,11 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Navbar from '@/components/Navbar';
+import { getPreservedProfileFor } from '@/utils/preservedProfile';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 export default function Signup() {
+  const { t } = useLanguage();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -17,7 +20,7 @@ export default function Signup() {
     e.preventDefault();
     
     if (password !== confirmPassword) {
-      alert('Passwords do not match');
+      alert(t('passwordsDoNotMatch'));
       return;
     }
     
@@ -35,13 +38,13 @@ export default function Signup() {
       if (response.ok) {
         const data = await response.json();
         
-        // Load preserved profile data from userProfileData if it exists
-        const preservedProfile = localStorage.getItem('userProfileData');
+        // Load preserved profile data (custom name/picture) if it belongs to this account
+        const preservedProfile = getPreservedProfileFor(data.user);
         const mergedUser = {
           ...data.user,
-          // Use preserved profile data if it exists
-          profilePicture: preservedProfile ? JSON.parse(preservedProfile).profilePicture : data.user.profilePicture,
-          name: preservedProfile ? JSON.parse(preservedProfile).name : data.user.name,
+          // Use preserved profile data if it exists (same account only)
+          profilePicture: preservedProfile ? preservedProfile.profilePicture : data.user.profilePicture,
+          name: preservedProfile ? preservedProfile.name : data.user.name,
         };
         
         localStorage.setItem('token', data.access_token);
@@ -52,11 +55,11 @@ export default function Signup() {
         
         router.push('/survey');
       } else {
-        alert('Signup failed');
+        alert(t('signupFailed'));
       }
     } catch (error) {
       console.error('Signup error:', error);
-      alert('Signup failed');
+      alert(t('signupFailed'));
     } finally {
       setIsLoading(false);
     }
@@ -76,10 +79,10 @@ export default function Signup() {
           />
           <div className="absolute inset-0 bg-black/30 flex flex-col justify-center p-16">
             <h1 className="text-5xl font-bold text-white mb-6">
-              Create an account
+              {t('createAnAccount')}
             </h1>
             <p className="text-2xl text-white/90">
-              Start your journey to find the perfect university
+              {t('startYourJourney')}
             </p>
           </div>
         </div>
@@ -89,24 +92,24 @@ export default function Signup() {
           <div className="w-full max-w-md animate-rise-in">
             <div className="mb-8">
               <p className="text-base text-slate-600">
-                Already have an account?{' '}
+                {t('alreadyHaveAccount')}{' '}
                 <Link href="/login" className="text-[#9370DB] hover:underline font-medium">
-                  Sign in
+                  {t('signIn')}
                 </Link>
               </p>
             </div>
 
             <h2 className="text-3xl font-bold text-slate-900 mb-2">
-              Sign up for UniVerse
+              {t('signUpForUniverse')}
             </h2>
             <p className="text-lg text-slate-600 mb-8">
-              Create your account to get started
+              {t('createYourAccount')}
             </p>
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label htmlFor="name" className="block text-sm font-medium text-slate-900 mb-2">
-                  Full Name
+                  {t('fullName')}
                 </label>
                 <input
                   id="name"
@@ -121,7 +124,7 @@ export default function Signup() {
 
               <div>
                 <label htmlFor="email" className="block text-sm font-medium text-slate-900 mb-2">
-                  Email
+                  {t('email')}
                 </label>
                 <input
                   id="email"
@@ -136,7 +139,7 @@ export default function Signup() {
 
               <div>
                 <label htmlFor="password" className="block text-sm font-medium text-slate-900 mb-2">
-                  Password
+                  {t('password')}
                 </label>
                 <input
                   id="password"
@@ -152,7 +155,7 @@ export default function Signup() {
 
               <div>
                 <label htmlFor="confirmPassword" className="block text-sm font-medium text-slate-900 mb-2">
-                  Confirm Password
+                  {t('confirmPassword')}
                 </label>
                 <input
                   id="confirmPassword"
@@ -173,13 +176,13 @@ export default function Signup() {
                   className="mt-1 rounded border-slate-300 text-[#9370DB] focus:ring-[#9370DB]"
                 />
                 <span className="ml-2 text-sm text-slate-600">
-                  I agree to the{' '}
+                  {t('iAgreeTo')}{' '}
                   <Link href="/terms" className="text-[#9370DB] hover:underline">
-                    Terms of Service
+                    {t('termsOfService')}
                   </Link>{' '}
-                  and{' '}
+                  {t('and')}{' '}
                   <Link href="/privacy" className="text-[#9370DB] hover:underline">
-                    Privacy Policy
+                    {t('privacyPolicy')}
                   </Link>
                 </span>
               </div>
@@ -189,7 +192,7 @@ export default function Signup() {
                 disabled={isLoading}
                 className="w-full px-4 py-3 bg-[#9370DB] text-white rounded-md font-medium hover:bg-[#7B68EE] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isLoading ? 'Creating account...' : 'Create account'}
+                {isLoading ? t('creatingAccount') : t('createAccountBtn')}
               </button>
             </form>
           </div>

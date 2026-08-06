@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { saveUserData } from '@/utils/userStorage';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface UserPreferences {
   intendedMajor: string;
@@ -17,6 +19,7 @@ interface UserPreferences {
 }
 
 export default function Survey() {
+  const { t } = useLanguage();
   const router = useRouter();
   const [step, setStep] = useState(1);
   const [preferences, setPreferences] = useState<UserPreferences>({
@@ -40,13 +43,13 @@ export default function Survey() {
   }, [router]);
 
   const handleSkip = () => {
-    localStorage.setItem('surveyCompleted', 'true');
+    saveUserData('surveyCompleted', 'true');
     router.push('/explore');
   };
 
   const handleSubmit = () => {
-    localStorage.setItem('userPreferences', JSON.stringify(preferences));
-    localStorage.setItem('surveyCompleted', 'true');
+    saveUserData('userPreferences', preferences);
+    saveUserData('surveyCompleted', 'true');
     router.push('/explore');
   };
 
@@ -74,8 +77,8 @@ export default function Survey() {
   return (
     <div className="min-h-screen bg-[#E8E8F0] flex items-center justify-center p-4">
       <div className="bg-[#C8C8E0] border border-[#A8A8C8] rounded-lg p-8 max-w-2xl w-full">
-        <h1 className="text-3xl font-bold text-slate-900 mb-2">Tell us about yourself</h1>
-        <p className="text-slate-800 mb-6">This helps us find the best universities for you</p>
+        <h1 className="text-3xl font-bold text-slate-900 mb-2">{t('tellUsAboutYourself')}</h1>
+        <p className="text-slate-800 mb-6">{t('thisHelpsUsFind')}</p>
 
         {/* Progress Bar */}
         <div className="flex gap-2 mb-8">
@@ -92,28 +95,28 @@ export default function Survey() {
         {step === 1 && (
           <div className="space-y-4 animate-fade-in">
             <div>
-              <label className="block text-slate-900 font-medium mb-2">What do you want to study?</label>
+              <label className="block text-slate-900 font-medium mb-2">{t('whatToStudy')}</label>
               <input
                 type="text"
                 value={preferences.intendedMajor}
                 onChange={(e) => setPreferences(prev => ({ ...prev, intendedMajor: e.target.value }))}
-                placeholder="e.g., Computer Science, Business, Medicine"
+                placeholder={t('majorPlaceholder')}
                 className="w-full px-4 py-3 bg-[#E8E8F0] border border-[#A8A8C8] rounded-lg text-slate-800 placeholder-slate-500 focus:outline-none focus:border-[#9370DB]"
               />
             </div>
             <div>
-              <label className="block text-slate-900 font-medium mb-2">What degree level?</label>
+              <label className="block text-slate-900 font-medium mb-2">{t('whatDegreeLevel')}</label>
               <select
                 value={preferences.degreeLevel}
                 onChange={(e) => setPreferences(prev => ({ ...prev, degreeLevel: e.target.value }))}
                 className="w-full px-4 py-3 bg-[#E8E8F0] border border-[#A8A8C8] rounded-lg text-slate-800 focus:outline-none focus:border-[#9370DB]"
               >
-                <option value="">Select degree level</option>
-                <option value="bachelor">Bachelor's Degree</option>
-                <option value="master">Master's Degree</option>
-                <option value="phd">PhD / Doctorate</option>
-                <option value="associate">Associate Degree</option>
-                <option value="certificate">Certificate / Diploma</option>
+                <option value="">{t('selectDegreeLevel')}</option>
+                <option value="bachelor">{t('bachelorsDegree')}</option>
+                <option value="master">{t('mastersDegree')}</option>
+                <option value="phd">{t('phdDoctorate')}</option>
+                <option value="associate">{t('associateDegree')}</option>
+                <option value="certificate">{t('certificateDiploma')}</option>
               </select>
             </div>
           </div>
@@ -122,7 +125,7 @@ export default function Survey() {
         {step === 2 && (
           <div className="space-y-4 animate-fade-in">
             <div>
-              <label className="block text-slate-900 font-medium mb-2">Preferred Regions</label>
+              <label className="block text-slate-900 font-medium mb-2">{t('preferredRegions')}</label>
               <div className="flex flex-wrap gap-2">
                 {['North America', 'Europe', 'Asia', 'Oceania', 'South America', 'Africa'].map((region) => (
                   <button
@@ -140,12 +143,12 @@ export default function Survey() {
               </div>
             </div>
             <div>
-              <label className="block text-slate-900 font-medium mb-2">Specific Countries (optional)</label>
+              <label className="block text-slate-900 font-medium mb-2">{t('specificCountries')}</label>
               <input
                 type="text"
                 value={preferences.preferredCountries.join(', ')}
                 onChange={(e) => setPreferences(prev => ({ ...prev, preferredCountries: e.target.value.split(',').map(c => c.trim()).filter(c => c) }))}
-                placeholder="e.g., USA, UK, Canada, Australia"
+                placeholder={t('specificCountriesPlaceholder')}
                 className="w-full px-4 py-3 bg-[#E8E8F0] border border-[#A8A8C8] rounded-lg text-slate-800 placeholder-slate-500 focus:outline-none focus:border-[#9370DB]"
               />
             </div>
@@ -155,28 +158,28 @@ export default function Survey() {
         {step === 3 && (
           <div className="space-y-4 animate-fade-in">
             <div>
-              <label className="block text-slate-900 font-medium mb-2">Annual Budget (USD)</label>
+              <label className="block text-slate-900 font-medium mb-2">{t('annualBudget')}</label>
               <select
                 value={preferences.budget}
                 onChange={(e) => setPreferences(prev => ({ ...prev, budget: e.target.value }))}
                 className="w-full px-4 py-3 bg-[#E8E8F0] border border-[#A8A8C8] rounded-lg text-slate-800 focus:outline-none focus:border-[#9370DB]"
               >
-                <option value="">Select budget range</option>
-                <option value="0-10000">Under $10,000</option>
-                <option value="10000-20000">$10,000 - $20,000</option>
-                <option value="20000-30000">$20,000 - $30,000</option>
-                <option value="30000-40000">$30,000 - $40,000</option>
-                <option value="40000-50000">$40,000 - $50,000</option>
-                <option value="50000+">$50,000+</option>
+                <option value="">{t('selectBudgetRange')}</option>
+                <option value="0-10000">{t('budgetUnder10k')}</option>
+                <option value="10000-20000">{t('budget10to20k')}</option>
+                <option value="20000-30000">{t('budget20to30k')}</option>
+                <option value="30000-40000">{t('budget30to40k')}</option>
+                <option value="40000-50000">{t('budget40to50k')}</option>
+                <option value="50000+">{t('budgetOver50k')}</option>
               </select>
             </div>
             <div>
-              <label className="block text-slate-900 font-medium mb-2">Your GPA (optional)</label>
+              <label className="block text-slate-900 font-medium mb-2">{t('yourGpa')}</label>
               <input
                 type="text"
                 value={preferences.gpa}
                 onChange={(e) => setPreferences(prev => ({ ...prev, gpa: e.target.value }))}
-                placeholder="e.g., 3.5, 85%, A"
+                placeholder={t('gpaPlaceholder')}
                 className="w-full px-4 py-3 bg-[#E8E8F0] border border-[#A8A8C8] rounded-lg text-slate-800 placeholder-slate-500 focus:outline-none focus:border-[#9370DB]"
               />
             </div>
@@ -186,7 +189,7 @@ export default function Survey() {
         {step === 4 && (
           <div className="space-y-4 animate-fade-in">
             <div>
-              <label className="block text-slate-900 font-medium mb-2">Language Requirements</label>
+              <label className="block text-slate-900 font-medium mb-2">{t('languageRequirements')}</label>
               <div className="flex flex-wrap gap-2">
                 {['English', 'Spanish', 'French', 'German', 'Chinese', 'Japanese', 'Korean'].map((lang) => (
                   <button
@@ -204,17 +207,17 @@ export default function Survey() {
               </div>
             </div>
             <div>
-              <label className="block text-slate-900 font-medium mb-2">Study Mode</label>
+              <label className="block text-slate-900 font-medium mb-2">{t('studyMode')}</label>
               <select
                 value={preferences.studyMode}
                 onChange={(e) => setPreferences(prev => ({ ...prev, studyMode: e.target.value }))}
                 className="w-full px-4 py-3 bg-[#E8E8F0] border border-[#A8A8C8] rounded-lg text-slate-800 focus:outline-none focus:border-[#9370DB]"
               >
-                <option value="">Select study mode</option>
-                <option value="on-campus">On-campus</option>
-                <option value="online">Online</option>
-                <option value="hybrid">Hybrid</option>
-                <option value="any">Any mode</option>
+                <option value="">{t('selectStudyMode')}</option>
+                <option value="on-campus">{t('onCampus')}</option>
+                <option value="online">{t('online')}</option>
+                <option value="hybrid">{t('hybrid')}</option>
+                <option value="any">{t('anyMode')}</option>
               </select>
             </div>
           </div>
@@ -223,26 +226,26 @@ export default function Survey() {
         {step === 5 && (
           <div className="space-y-4 animate-fade-in">
             <div>
-              <label className="block text-slate-900 font-medium mb-2">When do you want to start?</label>
+              <label className="block text-slate-900 font-medium mb-2">{t('whenToStart')}</label>
               <select
                 value={preferences.startDate}
                 onChange={(e) => setPreferences(prev => ({ ...prev, startDate: e.target.value }))}
                 className="w-full px-4 py-3 bg-[#E8E8F0] border border-[#A8A8C8] rounded-lg text-slate-800 focus:outline-none focus:border-[#9370DB]"
               >
-                <option value="">Select start date</option>
-                <option value="immediate">As soon as possible</option>
+                <option value="">{t('selectStartDate')}</option>
+                <option value="immediate">{t('asSoonAsPossible')}</option>
                 <option value="fall-2026">Fall 2026</option>
                 <option value="spring-2027">Spring 2027</option>
                 <option value="fall-2027">Fall 2027</option>
-                <option value="flexible">Flexible</option>
+                <option value="flexible">{t('flexible')}</option>
               </select>
             </div>
             <div>
-              <label className="block text-slate-900 font-medium mb-2">Extracurricular Activities / Interests (optional)</label>
+              <label className="block text-slate-900 font-medium mb-2">{t('extracurriculars')}</label>
               <textarea
                 value={preferences.extracurriculars}
                 onChange={(e) => setPreferences(prev => ({ ...prev, extracurriculars: e.target.value }))}
-                placeholder="Tell us about your hobbies, sports, clubs, volunteer work, etc."
+                placeholder={t('extracurricularsPlaceholder')}
                 rows={3}
                 className="w-full px-4 py-3 bg-[#E8E8F0] border border-[#A8A8C8] rounded-lg text-slate-800 placeholder-slate-500 focus:outline-none focus:border-[#9370DB] resize-none"
               />
@@ -257,28 +260,28 @@ export default function Survey() {
             disabled={step === 1}
             className="px-6 py-3 border border-[#A8A8C8] text-slate-900 rounded-lg hover:bg-[#A8A8C8] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Previous
+            {t('previous')}
           </button>
           <div className="flex gap-3">
             <button
               onClick={handleSkip}
               className="px-6 py-3 text-slate-800 hover:text-[#9370DB] transition-colors"
             >
-              Skip
+              {t('skip')}
             </button>
             {step === 5 ? (
               <button
                 onClick={handleSubmit}
                 className="px-6 py-3 bg-[#9370DB] text-white rounded-lg hover:bg-[#7B68EE] transition-colors"
               >
-                Submit
+                {t('submit')}
               </button>
             ) : (
               <button
                 onClick={nextStep}
                 className="px-6 py-3 bg-[#9370DB] text-white rounded-lg hover:bg-[#7B68EE] transition-colors"
               >
-                Next
+                {t('next')}
               </button>
             )}
           </div>
