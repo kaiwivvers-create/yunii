@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Menu, ChevronDown, ChevronUp, GraduationCap, Languages } from 'lucide-react';
-import { useLanguage } from '@/contexts/LanguageContext';
+import { useLanguage, LANG_OPTIONS } from '@/contexts/LanguageContext';
 
 interface NavbarProps {
   currentPage?: string;
@@ -16,6 +16,7 @@ export default function Navbar({ currentPage, onToggleSidebar, showHamburger }: 
   const { lang, setLang, t } = useLanguage();
   const [user, setUser] = useState<any>(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [langOpen, setLangOpen] = useState(false);
   const [adminDropdownOpen, setAdminDropdownOpen] = useState(false);
   const [appName, setAppName] = useState('UniVerse');
   const [appIcon, setAppIcon] = useState('');
@@ -79,15 +80,18 @@ export default function Navbar({ currentPage, onToggleSidebar, showHamburger }: 
   }, []);
 
   const handleLogout = () => {
-    // Preserve profile data before clearing user
-    const currentUser = localStorage.getItem('user');
-    if (currentUser) {
-      const parsedUser = JSON.parse(currentUser);
-      localStorage.setItem('userProfileData', JSON.stringify({
-        name: parsedUser.name,
-        profilePicture: parsedUser.profilePicture,
-      }));
-    }
+    // Preserve profile data before clearing user (never let a storage failure block logout)
+    try {
+      const currentUser = localStorage.getItem('user');
+      if (currentUser) {
+        const parsedUser = JSON.parse(currentUser);
+        localStorage.setItem('userProfileData', JSON.stringify({
+          email: parsedUser.email,
+          name: parsedUser.name,
+          profilePicture: parsedUser.profilePicture,
+        }));
+      }
+    } catch {}
     
     localStorage.removeItem('token');
     localStorage.removeItem('user');
@@ -157,15 +161,39 @@ export default function Navbar({ currentPage, onToggleSidebar, showHamburger }: 
             ) : null}
           </div>
           <div className="flex items-center gap-6">
-            {/* Language toggle */}
-            <button
-              onClick={() => setLang(lang === 'en' ? 'zh' : 'en')}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#9370DB]/15 text-[#6B4FBF] hover:bg-[#9370DB]/25 transition-colors text-xs font-semibold"
-              title="Switch language / 切换语言"
-            >
-              <Languages className="w-3.5 h-3.5" />
-              {lang === 'en' ? 'EN' : '中文'}
-            </button>
+            {/* Language switcher */}
+            <div className="relative">
+              <button
+                onClick={() => setLangOpen(!langOpen)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#9370DB]/15 text-[#6B4FBF] hover:bg-[#9370DB]/25 transition-colors text-xs font-semibold"
+                title="Switch language / 切换语言 / Ganti bahasa"
+              >
+                <Languages className="w-3.5 h-3.5" />
+                {LANG_OPTIONS.find((o) => o.value === lang)?.short ?? 'EN'}
+                <ChevronDown className="w-3 h-3" />
+              </button>
+              {langOpen && (
+                <div className="absolute right-0 mt-2 bg-[#C8C8E0] border border-[#A8A8C8] rounded-lg shadow-lg py-1 w-44 z-50 animate-fade-in-down">
+                  {LANG_OPTIONS.map((option) => (
+                    <button
+                      key={option.value}
+                      onClick={() => {
+                        setLang(option.value);
+                        setLangOpen(false);
+                      }}
+                      className={`w-full text-left px-4 py-2 text-sm transition-colors flex items-center justify-between ${
+                        lang === option.value
+                          ? 'text-[#6B4FBF] font-semibold'
+                          : 'text-slate-800 hover:bg-[#A8A8C8]'
+                      }`}
+                    >
+                      {option.label}
+                      {lang === option.value && <span className="text-[#9370DB]">✓</span>}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
 
             {/* Hamburger menu for sidebar toggle */}
             {showHamburger && onToggleSidebar && (

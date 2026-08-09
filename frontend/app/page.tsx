@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Navbar from '@/components/Navbar';
 import SurveyOverlay from '@/components/SurveyOverlay';
+import { loadUserData } from '@/utils/userStorage';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 const universities = [
   { name: 'Harvard University', location: 'Cambridge, USA', image: 'https://images.unsplash.com/photo-1562774053-701939374585?w=1200&h=800&fit=crop' },
@@ -20,11 +22,13 @@ const universities = [
 ];
 
 export default function Home() {
+  const { t } = useLanguage();
   const [currentUni, setCurrentUni] = useState(0);
   const [user, setUser] = useState<any>(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [showSurvey, setShowSurvey] = useState(false);
   const [isBlurred, setIsBlurred] = useState(false);
+  const [searchInput, setSearchInput] = useState('');
   const router = useRouter();
 
   useEffect(() => {
@@ -41,7 +45,7 @@ export default function Home() {
       setUser(JSON.parse(storedUser));
       
       // Check if survey needs to be shown (for non-admin users)
-      const surveyCompleted = localStorage.getItem('surveyCompleted');
+      const surveyCompleted = loadUserData<string>('surveyCompleted', '');
       const parsedUser = JSON.parse(storedUser);
       
       if (surveyCompleted !== 'true' && parsedUser.role !== 'admin') {
@@ -92,8 +96,8 @@ export default function Home() {
       {showSurvey && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
           <div className="bg-[#C8C8E0] dark:bg-dark-bg-secondary border border-[#A8A8C8] dark:border-dark-border rounded-lg p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto animate-scale-in">
-            <h1 className="text-3xl font-bold text-slate-900 dark:text-dark-text mb-2">Tell us about yourself</h1>
-            <p className="text-slate-800 dark:text-dark-text-secondary mb-6">This helps us find the best universities for you</p>
+            <h1 className="text-3xl font-bold text-slate-900 dark:text-dark-text mb-2">{t('tellUsAboutYourself')}</h1>
+            <p className="text-slate-800 dark:text-dark-text-secondary mb-6">{t('thisHelpsUsFind')}</p>
             
             <SurveyOverlay onClose={() => {
               setShowSurvey(false);
@@ -107,43 +111,55 @@ export default function Home() {
       <section className={`pt-32 pb-16 px-4 sm:px-6 lg:px-8 relative z-10 transition-all duration-500 ${isBlurred ? 'opacity-50 pointer-events-none' : ''}`}>
         <div className="text-center">
           <h1 className="text-4xl sm:text-5xl font-bold text-slate-900  mb-6 animate-rise-in">
-            Find Your Perfect University
+            {t('heroTitle')}
           </h1>
           <p className="text-lg text-slate-800  mb-10 max-w-2xl mx-auto animate-rise-in-1">
-            Discover universities and programs from around the world. Your journey to higher education starts here.
+            {t('heroSubtitle')}
           </p>
           
           {/* Search Bar */}
-          <div className="max-w-2xl mx-auto mb-12 animate-rise-in-2">
+          <form
+            className="max-w-2xl mx-auto mb-12 animate-rise-in-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const q = searchInput.trim();
+              router.push(q ? `/explore?q=${encodeURIComponent(q)}` : '/explore');
+            }}
+          >
             <div className="flex gap-2 border border-slate-300  rounded-lg overflow-hidden bg-white/80 backdrop-blur-sm">
               <input
                 type="text"
-                placeholder="Search universities, programs, or locations..."
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                placeholder={t('searchPlaceholder')}
                 className="flex-1 px-4 py-3 bg-transparent outline-none text-slate-900  placeholder-slate-600"
               />
-              <button className="px-6 py-3 bg-[#9370DB] text-white font-medium hover:bg-[#7B68EE] transition-colors">
-                Search
+              <button
+                type="submit"
+                className="px-6 py-3 bg-[#9370DB] text-white font-medium hover:bg-[#7B68EE] transition-colors"
+              >
+                {t('search')}
               </button>
             </div>
-          </div>
+          </form>
 
           {/* Quick Stats */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 animate-rise-in-3">
             <div className="text-center">
               <div className="text-2xl font-bold text-slate-900 ">150+</div>
-              <div className="text-sm text-slate-800 ">Countries</div>
+              <div className="text-sm text-slate-800 ">{t('countriesStat')}</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-slate-900 ">10K+</div>
-              <div className="text-sm text-slate-800 ">Universities</div>
+              <div className="text-sm text-slate-800 ">{t('universitiesStat')}</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-slate-900 ">50K+</div>
-              <div className="text-sm text-slate-800 ">Programs</div>
+              <div className="text-sm text-slate-800 ">{t('programsStat')}</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-slate-900 ">2M+</div>
-              <div className="text-sm text-slate-800 ">Students</div>
+              <div className="text-sm text-slate-800 ">{t('studentsStat')}</div>
             </div>
           </div>
         </div>
@@ -154,7 +170,7 @@ export default function Home() {
         <div className="text-center">
           <Link href="/explore">
             <button className="px-6 py-3 bg-[#9370DB] text-white rounded font-medium hover:bg-[#7B68EE] transition-colors">
-              Explore Universities
+              {t('exploreUniversities')}
             </button>
           </Link>
         </div>
@@ -166,32 +182,32 @@ export default function Home() {
         <div>
           <div className="text-center mb-12">
             <h2 className="text-2xl font-bold text-slate-900  mb-3">
-              Why UniVerse?
+              {t('whyUniverse')}
             </h2>
             <p className="text-slate-800 ">
-              Everything you need to find your perfect university
+              {t('whyUniverseSubtitle')}
             </p>
           </div>
 
           <div className="grid md:grid-cols-3 gap-6">
             <div className="bg-[#C8C8E0]  border border-slate-200  rounded-lg p-6 animate-rise-in">
-              <h3 className="font-semibold text-slate-900  mb-2">Smart Search</h3>
+              <h3 className="font-semibold text-slate-900  mb-2">{t('smartSearch')}</h3>
               <p className="text-sm text-slate-800 ">
-                Advanced filters to find universities that match your specific needs, location, and budget
+                {t('smartSearchDesc')}
               </p>
             </div>
 
             <div className="bg-[#C8C8E0]  border border-slate-200  rounded-lg p-6 animate-rise-in-1">
-              <h3 className="font-semibold text-slate-900  mb-2">Detailed Insights</h3>
+              <h3 className="font-semibold text-slate-900  mb-2">{t('detailedInsights')}</h3>
               <p className="text-sm text-slate-800 ">
-                Comprehensive data on rankings, programs, tuition, and student life
+                {t('detailedInsightsDesc')}
               </p>
             </div>
 
             <div className="bg-[#C8C8E0]  border border-slate-200  rounded-lg p-6 animate-rise-in-2">
-              <h3 className="font-semibold text-slate-900  mb-2">Global Network</h3>
+              <h3 className="font-semibold text-slate-900  mb-2">{t('globalNetwork')}</h3>
               <p className="text-sm text-slate-800 ">
-                Connect with students and alumni from universities around the world
+                {t('globalNetworkDesc')}
               </p>
             </div>
           </div>
@@ -202,22 +218,22 @@ export default function Home() {
       <section className="py-16 px-4 sm:px-6 lg:px-8">
         <div className="text-center">
           <h2 className="text-2xl font-bold text-slate-900  mb-3">
-            Ready to Start Your Journey?
+            {t('readyToStart')}
           </h2>
           <p className="text-slate-800  mb-6">
-            Join millions of students who found their perfect university through UniVerse
+            {t('readyToStartDesc')}
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             {!user && (
               <Link href="/signup">
                 <button className="px-6 py-3 bg-[#9370DB] text-white rounded font-medium hover:bg-[#7B68EE] transition-colors animate-rise-in-3">
-                  Create Free Account
+                  {t('createFreeAccount')}
                 </button>
               </Link>
             )}
             <Link href="/explore">
               <button className="px-6 py-3 border border-slate-300  text-slate-900  rounded font-medium hover:bg-slate-50  transition-colors animate-rise-in-4">
-                Explore Universities
+                {t('exploreUniversities')}
               </button>
             </Link>
           </div>
@@ -230,34 +246,34 @@ export default function Home() {
           <div className="grid md:grid-cols-4 gap-8 mb-8">
             <div>
               <p className="text-slate-800 text-sm">
-                Your gateway to universities worldwide.
+                {t('footerTagline')}
               </p>
             </div>
 
             <div>
-              <h4 className="font-semibold mb-3 text-sm">Platform</h4>
+              <h4 className="font-semibold mb-3 text-sm">{t('platform')}</h4>
               <ul className="space-y-2 text-slate-800 text-sm">
-                <li><a href="#" className="hover:text-white transition-colors">Search Universities</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Browse Programs</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Compare</a></li>
+                <li><a href="#" className="hover:text-white transition-colors">{t('searchUniversitiesLink')}</a></li>
+                <li><a href="#" className="hover:text-white transition-colors">{t('browsePrograms')}</a></li>
+                <li><a href="#" className="hover:text-white transition-colors">{t('compareLink')}</a></li>
               </ul>
             </div>
 
             <div>
-              <h4 className="font-semibold mb-3 text-sm">Resources</h4>
+              <h4 className="font-semibold mb-3 text-sm">{t('resources')}</h4>
               <ul className="space-y-2 text-slate-800 text-sm">
-                <li><a href="#" className="hover:text-white transition-colors">Blog</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Guides</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">FAQs</a></li>
+                <li><a href="#" className="hover:text-white transition-colors">{t('blog')}</a></li>
+                <li><a href="#" className="hover:text-white transition-colors">{t('guidesLink')}</a></li>
+                <li><a href="#" className="hover:text-white transition-colors">{t('faqs')}</a></li>
               </ul>
             </div>
 
             <div>
-              <h4 className="font-semibold mb-3 text-sm">Company</h4>
+              <h4 className="font-semibold mb-3 text-sm">{t('company')}</h4>
               <ul className="space-y-2 text-slate-800 text-sm">
-                <li><a href="#" className="hover:text-white transition-colors">About Us</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Contact</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Privacy Policy</a></li>
+                <li><a href="#" className="hover:text-white transition-colors">{t('aboutUs')}</a></li>
+                <li><a href="#" className="hover:text-white transition-colors">{t('contact')}</a></li>
+                <li><a href="#" className="hover:text-white transition-colors">{t('privacyPolicy')}</a></li>
               </ul>
             </div>
           </div>

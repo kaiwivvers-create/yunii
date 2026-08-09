@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { saveUserData } from '@/utils/userStorage';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface UserPreferences {
   intendedMajor: string[];
@@ -21,6 +23,7 @@ interface SurveyOverlayProps {
 }
 
 export default function SurveyOverlay({ onClose }: SurveyOverlayProps) {
+  const { t } = useLanguage();
   const router = useRouter();
   const [step, setStep] = useState(1);
   const [preferences, setPreferences] = useState<UserPreferences>({
@@ -37,14 +40,14 @@ export default function SurveyOverlay({ onClose }: SurveyOverlayProps) {
   });
 
   const handleSkip = () => {
-    localStorage.setItem('surveyCompleted', 'true');
+    saveUserData('surveyCompleted', 'true');
     onClose();
     router.push('/explore');
   };
 
   const handleSubmit = () => {
-    localStorage.setItem('userPreferences', JSON.stringify(preferences));
-    localStorage.setItem('surveyCompleted', 'true');
+    saveUserData('userPreferences', preferences);
+    saveUserData('surveyCompleted', 'true');
     onClose();
     router.push('/explore');
   };
@@ -96,7 +99,7 @@ export default function SurveyOverlay({ onClose }: SurveyOverlayProps) {
       {step === 1 && (
         <div className="space-y-4 animate-fade-in">
           <div>
-            <label className="block text-slate-900 dark:text-dark-text font-medium mb-2">What do you want to study?</label>
+            <label className="block text-slate-900 dark:text-dark-text font-medium mb-2">{t('whatToStudy')}</label>
             <div className="flex flex-wrap gap-2">
               {['Computer Science', 'Business', 'Medicine', 'Engineering', 'Arts', 'Law', 'Education', 'Psychology', 'Biology', 'Chemistry', 'Physics', 'Mathematics', 'Economics', 'Other'].map((major) => (
                 <button
@@ -114,18 +117,18 @@ export default function SurveyOverlay({ onClose }: SurveyOverlayProps) {
             </div>
           </div>
           <div>
-            <label className="block text-slate-900 dark:text-dark-text font-medium mb-2">What degree level?</label>
+            <label className="block text-slate-900 dark:text-dark-text font-medium mb-2">{t('whatDegreeLevel')}</label>
             <select
               value={preferences.degreeLevel}
               onChange={(e) => setPreferences(prev => ({ ...prev, degreeLevel: e.target.value }))}
               className="w-full px-4 py-3 bg-[#E8E8F0] dark:bg-dark-bg-tertiary border border-[#A8A8C8] dark:border-dark-border rounded-lg text-slate-800 dark:text-dark-text"
             >
-              <option value="">Select degree level</option>
-              <option value="bachelor">Bachelor's Degree</option>
-              <option value="master">Master's Degree</option>
-              <option value="phd">PhD / Doctorate</option>
-              <option value="associate">Associate Degree</option>
-              <option value="certificate">Certificate / Diploma</option>
+              <option value="">{t('selectDegreeLevel')}</option>
+              <option value="bachelor">{t('bachelorsDegree')}</option>
+              <option value="master">{t('mastersDegree')}</option>
+              <option value="phd">{t('phdDoctorate')}</option>
+              <option value="associate">{t('associateDegree')}</option>
+              <option value="certificate">{t('certificateDiploma')}</option>
             </select>
           </div>
         </div>
@@ -134,7 +137,7 @@ export default function SurveyOverlay({ onClose }: SurveyOverlayProps) {
       {step === 2 && (
         <div className="space-y-4 animate-fade-in">
           <div>
-            <label className="block text-slate-900 dark:text-dark-text font-medium mb-2">Preferred Regions</label>
+            <label className="block text-slate-900 dark:text-dark-text font-medium mb-2">{t('preferredRegions')}</label>
             <div className="flex flex-wrap gap-2">
               {['North America', 'Europe', 'Asia', 'Oceania', 'South America', 'Africa'].map((region) => (
                 <button
@@ -157,13 +160,13 @@ export default function SurveyOverlay({ onClose }: SurveyOverlayProps) {
       {step === 3 && (
         <div className="space-y-4 animate-fade-in">
           <div>
-            <label className="block text-slate-900 dark:text-dark-text font-medium mb-2">Annual Budget (USD)</label>
+            <label className="block text-slate-900 dark:text-dark-text font-medium mb-2">{t('annualBudget')}</label>
             <select
               value={preferences.budget}
               onChange={(e) => setPreferences(prev => ({ ...prev, budget: e.target.value }))}
               className="w-full px-4 py-3 bg-[#E8E8F0] dark:bg-dark-bg-tertiary border border-[#A8A8C8] dark:border-dark-border rounded-lg text-slate-800 dark:text-dark-text"
             >
-              <option value="">Select budget range</option>
+              <option value="">{t('selectBudgetRange')}</option>
               <option value="under-20k">Under $20,000</option>
               <option value="20k-40k">$20,000 - $40,000</option>
               <option value="40k-60k">$40,000 - $60,000</option>
@@ -173,12 +176,12 @@ export default function SurveyOverlay({ onClose }: SurveyOverlayProps) {
             </select>
           </div>
           <div>
-            <label className="block text-slate-900 dark:text-dark-text font-medium mb-2">GPA / Academic Performance</label>
+            <label className="block text-slate-900 dark:text-dark-text font-medium mb-2">{t('gpaPerformance')}</label>
             <input
               type="text"
               value={preferences.gpa}
               onChange={(e) => setPreferences(prev => ({ ...prev, gpa: e.target.value }))}
-              placeholder="e.g., 3.5, 85%, A"
+              placeholder={t('gpaPlaceholder')}
               className="w-full px-4 py-3 bg-[#E8E8F0] dark:bg-dark-bg-tertiary border border-[#A8A8C8] dark:border-dark-border rounded-lg text-slate-800 dark:text-dark-text"
             />
           </div>
@@ -188,7 +191,7 @@ export default function SurveyOverlay({ onClose }: SurveyOverlayProps) {
       {step === 4 && (
         <div className="space-y-4 animate-fade-in">
           <div>
-            <label className="block text-slate-900 dark:text-dark-text font-medium mb-2">Language Requirements</label>
+            <label className="block text-slate-900 dark:text-dark-text font-medium mb-2">{t('languageRequirements')}</label>
             <div className="flex flex-wrap gap-2">
               {['English', 'Spanish', 'French', 'German', 'Chinese', 'Japanese', 'Korean', 'Other'].map((lang) => (
                 <button
@@ -206,16 +209,16 @@ export default function SurveyOverlay({ onClose }: SurveyOverlayProps) {
             </div>
           </div>
           <div>
-            <label className="block text-slate-900 dark:text-dark-text font-medium mb-2">Study Mode</label>
+            <label className="block text-slate-900 dark:text-dark-text font-medium mb-2">{t('studyMode')}</label>
             <select
               value={preferences.studyMode}
               onChange={(e) => setPreferences(prev => ({ ...prev, studyMode: e.target.value }))}
               className="w-full px-4 py-3 bg-[#E8E8F0] dark:bg-dark-bg-tertiary border border-[#A8A8C8] dark:border-dark-border rounded-lg text-slate-800 dark:text-dark-text"
             >
-              <option value="">Select study mode</option>
-              <option value="on-campus">On-campus</option>
-              <option value="online">Online</option>
-              <option value="hybrid">Hybrid</option>
+              <option value="">{t('selectStudyMode')}</option>
+              <option value="on-campus">{t('onCampus')}</option>
+              <option value="online">{t('online')}</option>
+              <option value="hybrid">{t('hybrid')}</option>
             </select>
           </div>
         </div>
@@ -224,26 +227,26 @@ export default function SurveyOverlay({ onClose }: SurveyOverlayProps) {
       {step === 5 && (
         <div className="space-y-4 animate-fade-in">
           <div>
-            <label className="block text-slate-900 dark:text-dark-text font-medium mb-2">Preferred Start Date</label>
+            <label className="block text-slate-900 dark:text-dark-text font-medium mb-2">{t('preferredStartDate')}</label>
             <select
               value={preferences.startDate}
               onChange={(e) => setPreferences(prev => ({ ...prev, startDate: e.target.value }))}
               className="w-full px-4 py-3 bg-[#E8E8F0] dark:bg-dark-bg-tertiary border border-[#A8A8C8] dark:border-dark-border rounded-lg text-slate-800 dark:text-dark-text"
             >
-              <option value="">Select start date</option>
-              <option value="immediate">Immediate</option>
+              <option value="">{t('selectStartDate')}</option>
+              <option value="immediate">{t('asSoonAsPossible')}</option>
               <option value="fall-2024">Fall 2024</option>
               <option value="spring-2025">Spring 2025</option>
               <option value="fall-2025">Fall 2025</option>
-              <option value="later">Later than 2025</option>
+              <option value="later">{t('flexible')}</option>
             </select>
           </div>
           <div>
-            <label className="block text-slate-900 dark:text-dark-text font-medium mb-2">Extracurricular Activities (optional)</label>
+            <label className="block text-slate-900 dark:text-dark-text font-medium mb-2">{t('extracurriculars')}</label>
             <textarea
               value={preferences.extracurriculars}
               onChange={(e) => setPreferences(prev => ({ ...prev, extracurriculars: e.target.value }))}
-              placeholder="e.g., Sports, Music, Volunteering, Leadership roles"
+              placeholder={t('extracurricularsPlaceholder')}
               className="w-full px-4 py-3 bg-[#E8E8F0] dark:bg-dark-bg-tertiary border border-[#A8A8C8] dark:border-dark-border rounded-lg text-slate-800 dark:text-dark-text"
               rows={3}
             />
@@ -257,7 +260,7 @@ export default function SurveyOverlay({ onClose }: SurveyOverlayProps) {
           onClick={handleSkip}
           className="text-slate-600 dark:text-dark-text-secondary hover:text-slate-900 dark:hover:text-dark-text text-sm"
         >
-          Skip for now
+          {t('skipForNow')}
         </button>
         <div className="flex gap-2">
           {step > 1 && (
@@ -265,7 +268,7 @@ export default function SurveyOverlay({ onClose }: SurveyOverlayProps) {
               onClick={prevStep}
               className="px-4 py-2 bg-slate-500 text-white rounded-lg hover:bg-slate-600 transition-colors"
             >
-              Previous
+              {t('previous')}
             </button>
           )}
           {step < 5 ? (
@@ -273,14 +276,14 @@ export default function SurveyOverlay({ onClose }: SurveyOverlayProps) {
               onClick={nextStep}
               className="px-4 py-2 bg-[#9370DB] dark:bg-dark-violet text-white rounded-lg hover:bg-[#7B68EE] dark:hover:bg-dark-violet-hover transition-colors"
             >
-              Next
+              {t('next')}
             </button>
           ) : (
             <button
               onClick={handleSubmit}
               className="px-4 py-2 bg-[#9370DB] dark:bg-dark-violet text-white rounded-lg hover:bg-[#7B68EE] dark:hover:bg-dark-violet-hover transition-colors"
             >
-              Complete
+              {t('complete')}
             </button>
           )}
         </div>

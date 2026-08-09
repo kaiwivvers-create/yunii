@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Lock } from 'lucide-react';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface LoginModalProps {
   open: boolean;
@@ -14,6 +15,7 @@ interface LoginModalProps {
  * (chatting, exploring university details, etc.). Prompts them to sign in.
  */
 export default function LoginModal({ open, onClose }: LoginModalProps) {
+  const { t } = useLanguage();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -35,10 +37,10 @@ export default function LoginModal({ open, onClose }: LoginModalProps) {
           <Lock className="w-7 h-7 text-white" />
         </div>
         <h2 className="text-2xl font-bold text-slate-900 dark:text-dark-text mb-2">
-          Sign in to continue
+          {t('signInToContinueFeature')}
         </h2>
         <p className="text-slate-800 dark:text-dark-text-secondary mb-6">
-          You need an account to use this feature. It only takes a minute to create one.
+          {t('needAccountToUseFeature')}
         </p>
         <div className="space-y-3">
           <Link
@@ -46,21 +48,21 @@ export default function LoginModal({ open, onClose }: LoginModalProps) {
             onClick={onClose}
             className="block w-full px-4 py-3 bg-[#9370DB] dark:bg-dark-violet text-white rounded-lg font-medium hover:bg-[#7B68EE] dark:hover:bg-dark-violet-hover transition-colors"
           >
-            Sign In
+            {t('signIn')}
           </Link>
           <Link
             href="/signup"
             onClick={onClose}
             className="block w-full px-4 py-3 border border-[#A8A8C8] dark:border-dark-border text-slate-900 dark:text-dark-text rounded-lg font-medium hover:bg-[#D8D8E8] dark:hover:bg-dark-bg-tertiary transition-colors"
           >
-            Create an Account
+            {t('createAccount')}
           </Link>
         </div>
         <button
           onClick={onClose}
           className="mt-4 text-sm text-slate-600 dark:text-dark-text-secondary hover:text-slate-900 dark:hover:text-dark-text transition-colors"
         >
-          Maybe later
+          {t('maybeLaterShort')}
         </button>
       </div>
     </div>

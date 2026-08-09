@@ -14,4 +14,14 @@ export class AuthController {
   signup(@Body() signupDto: { name: string; email: string; password: string }): Promise<{ access_token: string; user: User }> {
     return this.authService.signup(signupDto);
   }
+
+  @Post('send-verification-code')
+  sendVerificationCode(@Body() body: { email: string }) {
+    return this.authService.sendVerificationCode(body.email);
+  }
+
+  @Post('verify-email-code')
+  verifyEmailCode(@Body() body: { email: string; code: string }) {
+    return this.authService.verifyEmailCode(body.email, body.code);
+  }
 }

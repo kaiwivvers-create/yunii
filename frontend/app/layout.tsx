@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import ChatbotWrapper from "@/components/ChatbotWrapper";
-import FloatingBubbles from "@/components/FloatingBubbles";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 
@@ -34,7 +33,6 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col">
         <ThemeProvider>
           <LanguageProvider>
-            <FloatingBubbles />
             {children}
             <ChatbotWrapper />
           </LanguageProvider>

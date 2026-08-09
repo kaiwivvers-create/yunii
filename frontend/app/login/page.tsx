@@ -4,8 +4,12 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Navbar from '@/components/Navbar';
+import { getPreservedProfileFor } from '@/utils/preservedProfile';
+import { loadUserData } from '@/utils/userStorage';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 export default function Login() {
+  const { t } = useLanguage();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -37,8 +41,8 @@ export default function Login() {
         console.log('data.user.role:', data.user?.role);
         console.log('=== END DEBUGGING ===');
         
-        // Load preserved profile data from userProfileData
-        const preservedProfile = localStorage.getItem('userProfileData');
+        // Load preserved profile data (custom name/picture) if it belongs to this account
+        const preservedProfile = getPreservedProfileFor(data.user);
         console.log('Preserved profile:', preservedProfile);
         
         // Explicitly construct user to avoid spread operator issues
@@ -47,8 +51,8 @@ export default function Login() {
           email: data.user.email,
           // Hardcode admin role for kai@example.com as a workaround
           role: data.user.email === 'kai@example.com' ? 'admin' : (data.user.role || 'user'),
-          name: preservedProfile ? JSON.parse(preservedProfile).name : data.user.name,
-          profilePicture: preservedProfile ? JSON.parse(preservedProfile).profilePicture : data.user.profilePicture,
+          name: preservedProfile ? preservedProfile.name : data.user.name,
+          profilePicture: preservedProfile ? preservedProfile.profilePicture : data.user.profilePicture,
         };
         
         console.log('Merged user:', mergedUser); // Debug log
@@ -76,7 +80,7 @@ export default function Login() {
           return;
         }
         
-        const surveyCompleted = localStorage.getItem('surveyCompleted');
+        const surveyCompleted = loadUserData<string>('surveyCompleted', '');
         if (surveyCompleted !== 'true') {
           router.push('/survey');
         } else {
@@ -84,11 +88,11 @@ export default function Login() {
         }
       } else {
         console.error('Login failed with status:', response.status);
-        alert('Login failed');
+        alert(t('loginFailed'));
       }
     } catch (error) {
       console.error('Login error:', error);
-      alert('Login failed');
+      alert(t('loginFailed'));
     } finally {
       setIsLoading(false);
     }
@@ -108,10 +112,10 @@ export default function Login() {
           />
           <div className="absolute inset-0 bg-black/30 flex flex-col justify-center p-16">
             <h1 className="text-5xl font-bold text-white mb-6">
-              Welcome back
+              {t('welcomeBackTitle')}
             </h1>
             <p className="text-2xl text-white/90">
-              Sign in to your account to continue
+              {t('signInToContinue')}
             </p>
           </div>
         </div>
@@ -121,24 +125,24 @@ export default function Login() {
           <div className="w-full max-w-md animate-rise-in">
             <div className="mb-8">
               <p className="text-base text-slate-600">
-                Don't have an account?{' '}
+                {t('dontHaveAccount')}{' '}
                 <Link href="/signup" className="text-[#9370DB] hover:underline font-medium">
-                  Sign up
+                  {t('signup')}
                 </Link>
               </p>
             </div>
 
             <h2 className="text-3xl font-bold text-slate-900 mb-2">
-              Sign in to UniVerse
+              {t('signInToUniverse')}
             </h2>
             <p className="text-lg text-slate-600 mb-8">
-              Welcome back! Please enter your details
+              {t('welcomeBackDetails')}
             </p>
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label htmlFor="email" className="block text-sm font-medium text-slate-900 mb-2">
-                  Email
+                  {t('email')}
                 </label>
                 <input
                   id="email"
@@ -153,7 +157,7 @@ export default function Login() {
 
               <div>
                 <label htmlFor="password" className="block text-sm font-medium text-slate-900 mb-2">
-                  Password
+                  {t('password')}
                 </label>
                 <input
                   id="password"
@@ -169,10 +173,10 @@ export default function Login() {
               <div className="flex items-center justify-between">
                 <label className="flex items-center">
                   <input type="checkbox" className="rounded border-slate-300 text-[#9370DB] focus:ring-[#9370DB]" />
-                  <span className="ml-2 text-sm text-slate-600">Remember me</span>
+                  <span className="ml-2 text-sm text-slate-600">{t('rememberMe')}</span>
                 </label>
                 <Link href="/forgot-password" className="text-sm text-[#9370DB] hover:underline">
-                  Forgot password?
+                  {t('forgotPassword')}
                 </Link>
               </div>
 
@@ -181,7 +185,7 @@ export default function Login() {
                 disabled={isLoading}
                 className="w-full px-4 py-3 bg-[#9370DB] text-white rounded-md font-medium hover:bg-[#7B68EE] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isLoading ? 'Signing in...' : 'Sign in'}
+                {isLoading ? t('signingIn') : t('signIn')}
               </button>
             </form>
           </div>
