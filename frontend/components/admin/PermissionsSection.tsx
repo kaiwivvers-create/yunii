@@ -28,6 +28,12 @@ export default function PermissionsSection() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<number | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
+  const [user, setUser] = useState<any>(null);
+
+  useEffect(() => {
+    const stored = localStorage.getItem('user');
+    setUser(stored ? JSON.parse(stored) : null);
+  }, []);
 
   useEffect(() => {
     const load = async () => {
@@ -60,7 +66,11 @@ export default function PermissionsSection() {
       const res = await fetch(`/api/admin/roles/${roleId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ permissions: next }),
+        body: JSON.stringify({
+          permissions: next,
+          actor: user?.name || 'admin',
+          actorRole: user?.role || '',
+        }),
       });
       if (res.ok) {
         const updated = await res.json();

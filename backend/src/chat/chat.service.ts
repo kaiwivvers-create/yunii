@@ -1,10 +1,25 @@
 import { Injectable } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { SettingsEntity } from '../database/entities';
 
 @Injectable()
 export class ChatService {
+  constructor(
+    @InjectRepository(SettingsEntity)
+    private readonly settings: Repository<SettingsEntity>,
+  ) {}
+
+  /** The configured app name (settings row), defaulting to 'UniVerse'. */
+  private async appName(): Promise<string> {
+    const rows = await this.settings.find({ order: { id: 'ASC' } });
+    return (rows[0]?.appName || 'UniVerse').trim() || 'UniVerse';
+  }
+
   async generateResponse(message: string, context?: string, history?: Array<{role: string; content: string}>): Promise<{ response: string }> {
-    // Build system prompt with context
-    let systemPrompt = 'You are a helpful AI assistant for UniVerse, a university discovery platform that helps students find and explore universities worldwide.';
+    // Build system prompt with the configured app name
+    const appName = await this.appName();
+    let systemPrompt = `You are a helpful AI assistant for ${appName}, a university discovery platform that helps students find and explore universities worldwide.`;
     
     if (context) {
       systemPrompt += '\n\nContext about the current situation:\n' + context;

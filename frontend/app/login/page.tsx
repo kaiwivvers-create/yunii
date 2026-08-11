@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import Navbar from '@/components/Navbar';
 import { getPreservedProfileFor } from '@/utils/preservedProfile';
 import { loadUserData } from '@/utils/userStorage';
+import { isAdminRole } from '@/utils/roles';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 export default function Login() {
@@ -13,11 +14,13 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
   const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setError('');
     
     try {
       console.log('Login - Attempting login with:', email);
@@ -45,14 +48,22 @@ export default function Login() {
         const preservedProfile = getPreservedProfileFor(data.user);
         console.log('Preserved profile:', preservedProfile);
         
-        // Explicitly construct user to avoid spread operator issues
+        // Explicitly construct user to avoid spread operator issues.
+        // - name: preservedProfile wins so custom display names set before the
+        //   backend persisted them keep working (it's account-scoped, so it can't
+        //   leak). The backend wins whenever the local copy is absent (new device).
+        // - profilePicture: the backend is authoritative so removing a photo
+        //   sticks and edits made elsewhere are honored; the local copy is only a
+        //   fallback for accounts edited before backend persistence existed.
         const mergedUser = {
           id: data.user.id,
           email: data.user.email,
-          // Hardcode admin role for kai@example.com as a workaround
-          role: data.user.email === 'kai@example.com' ? 'admin' : (data.user.role || 'user'),
-          name: preservedProfile ? preservedProfile.name : data.user.name,
-          profilePicture: preservedProfile ? preservedProfile.profilePicture : data.user.profilePicture,
+          // Demo owner account is the Super Admin
+          role: data.user.email === 'kai@example.com' ? 'super_admin' : (data.user.role || 'user'),
+          name: preservedProfile?.name || data.user.name || 'User',
+          profilePicture: data.user.profilePicture || preservedProfile?.profilePicture || '',
+          // Carry over effective permissions from the backend so admin gating works
+          permissions: data.user.permissions || [],
         };
         
         console.log('Merged user:', mergedUser); // Debug log
@@ -74,25 +85,44 @@ export default function Login() {
         window.dispatchEvent(new Event('userLogin'));
         
         // Skip survey for admin users
-        if (mergedUser.role === 'admin') {
+        if (isAdminRole(mergedUser.role)) {
           console.log('Admin user detected, skipping survey');
           router.push('/');
           return;
         }
         
-        const surveyCompleted = loadUserData<string>('surveyCompleted', '');
-        if (surveyCompleted !== 'true') {
+        // Legacy data may have stored surveyCompleted as a raw string ('true'),
+        // which loadUserData's migration returns as the boolean `true`. Accept both.
+        const surveyCompleted = loadUserData<string | boolean>('surveyCompleted', '');
+        let surveyDone = surveyCompleted === 'true' || surveyCompleted === true;
+        // The database is authoritative: if the survey was completed on another
+        // device, don't push the user through it again.
+        if (!surveyDone && mergedUser.email) {
+          try {
+            const prefsRes = await fetch(
+              `/api/preferences?email=${encodeURIComponent(mergedUser.email)}`,
+            );
+            if (prefsRes.ok) {
+              const prefsData = await prefsRes.json();
+              if (prefsData?.preferences?.surveyCompleted) surveyDone = true;
+            }
+          } catch {
+            // Backend unreachable — fall back to the local check
+          }
+        }
+        if (!surveyDone) {
           router.push('/survey');
         } else {
           router.push('/');
         }
       } else {
         console.error('Login failed with status:', response.status);
-        alert(t('loginFailed'));
+        const errData = await response.json().catch(() => ({}));
+        setError(errData.message || t('loginFailed'));
       }
     } catch (error) {
       console.error('Login error:', error);
-      alert(t('loginFailed'));
+      setError(t('loginFailed'));
     } finally {
       setIsLoading(false);
     }
@@ -121,8 +151,8 @@ export default function Login() {
         </div>
 
         {/* Right side - White Form */}
-        <div className="w-full lg:w-1/2 bg-white flex items-center justify-center p-8 lg:p-16">
-          <div className="w-full max-w-md animate-rise-in">
+        <div className="w-full lg:w-1/2 bg-white flex overflow-y-auto">
+          <div className="m-auto w-full max-w-md px-6 py-10 sm:p-8 lg:p-16 animate-rise-in">
             <div className="mb-8">
               <p className="text-base text-slate-600">
                 {t('dontHaveAccount')}{' '}
@@ -179,6 +209,12 @@ export default function Login() {
                   {t('forgotPassword')}
                 </Link>
               </div>
+
+              {error && (
+                <div className="px-4 py-3 rounded-md bg-red-500/10 border border-red-500/30 text-sm text-red-600 font-medium">
+                  {error}
+                </div>
+              )}
 
               <button
                 type="submit"

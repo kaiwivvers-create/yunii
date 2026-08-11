@@ -6,9 +6,20 @@ import { useParams, useRouter } from 'next/navigation';
 import Navbar from '../../../components/Navbar';
 import GuideEditor from '@/components/GuideEditor';
 import { guides, getGuide } from '../../../data/guides';
+import { localizeGuide } from '../../../data/guideTranslations';
 import { getGuideBySlug, loadGuides } from '../../../utils/guidesStore';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { isAdminRole } from '@/utils/roles';
 import { ArrowLeft, Clock, Check, Lock, Pencil } from 'lucide-react';
+
+const categoryKeys: Record<string, string> = {
+  Admissions: 'admissions',
+  Costs: 'costs',
+  Visas: 'visas',
+  Scholarships: 'scholarshipsGuide',
+  Deadlines: 'deadlinesGuide',
+  'Country Guides': 'countryGuides',
+};
 
 export default function GuideArticlePage() {
   const params = useParams();
@@ -29,7 +40,7 @@ export default function GuideArticlePage() {
       setIsLoggedIn(!!storedUser);
       if (storedUser) {
         try {
-          setIsAdmin(JSON.parse(storedUser).role === 'admin');
+          setIsAdmin(isAdminRole(JSON.parse(storedUser).role));
         } catch {
           setIsAdmin(false);
         }
@@ -50,6 +61,7 @@ export default function GuideArticlePage() {
   // Deriving from the current slug avoids a stale-article flash when navigating
   // between related guides, and picks up admin edits after save.
   const guide = mounted ? getGuideBySlug(slug) : getGuide(slug);
+  const displayed = guide ? localizeGuide(guide, lang) : null;
   const related = mounted
     ? loadGuides().filter((g) => g.slug !== slug).slice(0, 4)
     : guides.filter((g) => g.slug !== slug).slice(0, 4);
@@ -62,7 +74,7 @@ export default function GuideArticlePage() {
     );
   }
 
-  if (!guide) {
+  if (!guide || !displayed) {
     return (
       <div className="min-h-screen bg-[#E8E8F0] flex items-center justify-center">
         <div className="text-center">
@@ -88,7 +100,7 @@ export default function GuideArticlePage() {
               {t('signInToReadGuide')}
             </h2>
             <p className="text-sm font-semibold text-[#9370DB] mb-1">
-              {lang === 'zh' ? guide.titleZh : guide.title}
+              {displayed.title}
             </p>
             <p className="text-slate-600 mb-6">
               {t('createFreeAccountUnlock')}
@@ -145,7 +157,7 @@ export default function GuideArticlePage() {
                 </div>
                 <div className="min-w-0">
                   <h3 className="text-xs font-semibold text-slate-900 group-hover:text-[#9370DB] transition-colors line-clamp-2">
-                    {lang === 'zh' ? g.titleZh : g.title}
+                    {localizeGuide(g, lang).title}
                   </h3>
                   <p className="text-[11px] text-slate-500 mt-1 flex items-center gap-1">
                     <Clock className="w-3 h-3" />
@@ -159,7 +171,8 @@ export default function GuideArticlePage() {
 
         {/* Article */}
         <section className="order-1 lg:order-2 flex-1 min-w-0 overflow-y-auto px-4 sm:px-6 lg:px-10">
-          <div className="max-w-3xl mx-auto py-8">
+          {/* Wide article column — fills the pane on normal screens, capped only on ultra-wide monitors */}
+          <div className="max-w-6xl mx-auto py-8">
             <div className="flex items-center justify-between mb-6">
               <Link
                 href="/guides"
@@ -185,9 +198,9 @@ export default function GuideArticlePage() {
               <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
               <div className="absolute bottom-0 p-6 text-white">
                 <span className="px-2.5 py-1 bg-white/20 backdrop-blur rounded-full text-xs font-medium">
-                  {guide.category}
+                  {t(categoryKeys[guide.category] || guide.category)}
                 </span>
-                <h1 className="text-3xl font-bold mt-3">{lang === 'zh' ? guide.titleZh : guide.title}</h1>
+                <h1 className="text-3xl font-bold mt-3">{displayed.title}</h1>
                 <div className="flex items-center gap-2 text-sm text-white/80 mt-2">
                   <Clock className="w-4 h-4" />
                   {guide.readTime} {t('readTime')}
@@ -197,7 +210,7 @@ export default function GuideArticlePage() {
 
             {/* Body */}
             <div className="space-y-8">
-              {guide.sections.map((section, i) => (
+              {displayed.sections.map((section, i) => (
                 <div
                   key={i}
                   className="bg-white rounded-2xl border border-[#E2E0F0] p-6 sm:p-8 animate-rise-in"

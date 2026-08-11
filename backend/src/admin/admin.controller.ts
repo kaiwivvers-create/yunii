@@ -1,674 +1,166 @@
-import { Controller, Get, Post, Put, Delete, Body, Param } from '@nestjs/common';
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
-import { join } from 'path';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Delete,
+  ForbiddenException,
+  Get,
+  NotFoundException,
+  Param,
+  Post,
+  Put,
+  Query,
+} from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { DataSource, Repository } from 'typeorm';
+import {
+  UserEntity,
+  RoleEntity,
+  UniversityEntity,
+  RegionEntity,
+  SettingsEntity,
+  ActivityLogEntity,
+  VersionEntity,
+  TrashItemEntity,
+  BookmarkEntity,
+  ReviewEntity,
+  ApplicationEntity,
+  UserPreferencesEntity,
+  AcademicScoreEntity,
+  RecommendationEntity,
+  ProgramEntity,
+  UniversityRequirementEntity,
+  ScholarshipEntity,
+} from '../database/entities';
+import {
+  ALL_PERMISSIONS,
+  applyDbShape,
+  deriveUniversityRelations,
+  enrichUniversity,
+  normalizeUser,
+  rolePerms,
+  SEED_SETTINGS,
+} from '../database/seed';
 
 // ---------------------------------------------------------------------------
-// File-backed persistence + admin systems. (data lives in backend/data/db.json)
-// Data is stored in backend/data/db.json so changes survive server restarts.
-// Includes: CRUD for universities/regions/users, soft-delete trash with
-// revert/permanent-delete, per-university version history, activity log,
-// settings, permissions, bookmark tracking, export/import and reports.
-// Swap this for Postgres later — the API contract stays the same.
+// Audit helpers
 // ---------------------------------------------------------------------------
-
-interface ActivityEntry {
-  id: number;
-  action: string; // created | edited | deleted | reverted | permanently_deleted | imported | restored
-  entity: string; // university | region | user | settings
-  entityId: string;
-  entityName: string;
-  actor: string;
-  timestamp: string;
-  meta?: any;
-}
-
-interface VersionEntry {
-  version: number;
-  snapshot: any;
-  timestamp: string;
-  actor: string;
-  summary: string;
-}
-
-interface TrashItem {
-  id: number;
-  type: 'university' | 'user';
-  item: any;
-  deletedAt: string;
-  deletedBy: string;
-}
-
-interface BookmarkEvent {
-  id: number;
-  universityId: number;
-  universityName: string;
-  region: string;
-  action: 'save' | 'unsave';
-  userEmail?: string;
-  timestamp: string;
-}
-
-interface Role {
-  id: number;
-  name: string;
-  permissions: string[];
-  isSystem?: boolean;
-}
-
-interface DbShape {
-  universities: any[];
-  regions: string[];
-  users: any[];
-  roles: Role[];
-  settings: { appName: string; appIcon: string };
-  activityLog: ActivityEntry[];
-  versions: Record<string, VersionEntry[]>;
-  trash: TrashItem[];
-  bookmarks: BookmarkEvent[];
-}
-
-export const ALL_PERMISSIONS = [
-  'manage_content',
-  'manage_users',
-  'manage_settings',
-  'view_reports',
-  'manage_system',
-];
-
-const DATA_DIR = join(process.cwd(), 'data');
-const DB_FILE = join(DATA_DIR, 'db.json');
-
-const seedDb: DbShape = {
-  universities: [
-    {
-      id: 1,
-      name: 'Harvard University',
-      location: 'Cambridge, USA',
-      province: 'Massachusetts',
-      region: 'North America',
-      description: 'Ivy League research university',
-      image: 'https://images.unsplash.com/photo-1562774053-701939374585?w=800',
-      details: {
-        overview: 'Founded in 1636, Harvard is the oldest institution of higher learning in the United States',
-        details: ['Located in Cambridge, Massachusetts', 'Part of the prestigious Ivy League', 'Known for its law, business, and medical schools', 'Endowment of over $50 billion', 'Notable alumni include 8 U.S. Presidents and numerous Nobel laureates'],
-        courses: [
-          { name: 'Computer Science', details: 'Study of computation and information' },
-          { name: 'Economics', details: 'Study of production, consumption, and transfer of wealth' },
-          { name: 'Political Science', details: 'Study of politics and government' },
-          { name: 'Psychology', details: 'Study of mind and behavior' }
-        ],
-        requirements: ['High school diploma or equivalent', 'SAT/ACT scores', 'Letters of recommendation', 'Personal statement', 'Extracurricular activities'],
-        prices: { undergraduate: '$57,261 per year', graduate: '$52,000 - $58,000 per year' }
-      }
-    },
-    {
-      id: 2,
-      name: 'MIT',
-      location: 'Cambridge, USA',
-      province: 'Massachusetts',
-      region: 'North America',
-      description: 'Leading technology and engineering school',
-      image: 'https://images.unsplash.com/photo-1564981797816-1043664bf78d?w=800',
-      details: {
-        overview: 'Founded in 1861, MIT is world-renowned for engineering, computer science, and physical sciences',
-        details: ['Located in Cambridge, Massachusetts', 'Strong emphasis on innovation and entrepreneurship', 'Notable for developing key technologies like the internet and GPS', '96 Nobel laureates associated with the institute'],
-        courses: [
-          { name: 'Computer Science', details: 'Study of computation and information' },
-          { name: 'Electrical Engineering', details: 'Study of electrical systems' },
-          { name: 'Mechanical Engineering', details: 'Study of mechanical systems' },
-          { name: 'Physics', details: 'Study of matter and energy' }
-        ],
-        requirements: ['High school diploma with strong STEM focus', 'SAT/ACT scores (high math and science)', 'Letters of recommendation from math/science teachers', 'Personal statement', 'Research experience or projects'],
-        prices: { undergraduate: '$57,986 per year', graduate: '$57,590 per year' }
-      }
-    },
-    {
-      id: 3,
-      name: 'Stanford University',
-      location: 'Stanford, USA',
-      province: 'California',
-      region: 'North America',
-      description: 'Silicon Valley research university',
-      image: 'https://images.unsplash.com/photo-1571269259264-5ccb2e888cbe?w=800',
-      details: {
-        overview: 'Founded in 1885, Stanford is known for its academic strength and proximity to Silicon Valley',
-        details: ['Located in Stanford, California', 'Strong ties to Silicon Valley tech industry', 'Known for entrepreneurship and innovation', 'One of the largest university campuses in the US'],
-        courses: [
-          { name: 'Computer Science', details: 'Study of computation and information' },
-          { name: 'Business', details: 'Study of business administration' },
-          { name: 'Engineering', details: 'Study of engineering disciplines' },
-          { name: 'Medicine', details: 'Study of medical sciences' }
-        ],
-        requirements: ['High school diploma', 'SAT/ACT scores', 'Letters of recommendation', 'Personal statement', 'Extracurricular activities'],
-        prices: { undergraduate: '$56,169 per year', graduate: '$54,315 per year' }
-      }
-    },
-    {
-      id: 4,
-      name: 'University of Oxford',
-      location: 'Oxford, UK',
-      province: 'England',
-      region: 'Europe',
-      description: 'Oldest English-speaking university',
-      image: 'https://images.unsplash.com/photo-1580537659466-0a9bfa916a54?w=800',
-      details: {
-        overview: 'Founded in 1096, Oxford is the oldest university in the English-speaking world',
-        details: ['Located in Oxford, England', 'Collegiate system with 39 colleges', 'Known for academic excellence and research', 'Notable alumni include 28 British Prime Ministers'],
-        courses: [
-          { name: 'Philosophy, Politics and Economics', details: 'Interdisciplinary study of PPE' },
-          { name: 'Medicine', details: 'Study of medical sciences' },
-          { name: 'Law', details: 'Study of legal systems' },
-          { name: 'English Literature', details: 'Study of English literature' }
-        ],
-        requirements: ['A-levels or equivalent', 'Personal statement', 'Academic references', 'Admissions test', 'Interview'],
-        prices: { undergraduate: '£9,250 per year (UK)', graduate: '£10,000 - £40,000 per year' }
-      }
-    },
-    {
-      id: 5,
-      name: 'University of Cambridge',
-      location: 'Cambridge, UK',
-      province: 'England',
-      region: 'Europe',
-      description: 'Historic research university',
-      image: 'https://images.unsplash.com/photo-1592500565497-991d3e2e5f9a?w=800',
-      details: {
-        overview: 'Founded in 1209, Cambridge is one of the world\'s oldest and most prestigious universities',
-        details: ['Located in Cambridge, England', 'Collegiate system with 31 colleges', 'Known for scientific research and academic excellence', 'Notable alumni include 120 Nobel laureates'],
-        courses: [
-          { name: 'Natural Sciences', details: 'Study of natural sciences' },
-          { name: 'Engineering', details: 'Study of engineering disciplines' },
-          { name: 'Mathematics', details: 'Study of mathematics' },
-          { name: 'Computer Science', details: 'Study of computation and information' }
-        ],
-        requirements: ['A-levels or equivalent', 'Personal statement', 'Academic references', 'Admissions test', 'Interview'],
-        prices: { undergraduate: '£9,250 per year (UK)', graduate: '£10,000 - £45,000 per year' }
-      }
-    },
-    {
-      id: 6,
-      name: 'ETH Zurich',
-      location: 'Zurich, Switzerland',
-      province: 'Zurich',
-      region: 'Europe',
-      description: 'Leading technical university',
-      image: 'https://images.unsplash.com/photo-1555861496-0666c8981751?w=800',
-      details: {
-        overview: 'Founded in 1855, ETH Zurich is one of the world\'s leading technical universities',
-        details: ['Located in Zurich, Switzerland', 'Known for engineering and technology', 'Strong industry connections', '21 Nobel laureates associated with the university'],
-        courses: [
-          { name: 'Computer Science', details: 'Study of computation and information' },
-          { name: 'Mechanical Engineering', details: 'Study of mechanical systems' },
-          { name: 'Electrical Engineering', details: 'Study of electrical systems' },
-          { name: 'Architecture', details: 'Study of architecture and design' }
-        ],
-        requirements: ['High school diploma with strong math/science', 'Entrance exam', 'Personal statement', 'Letters of recommendation'],
-        prices: { undergraduate: 'CHF 1,300 per semester', graduate: 'CHF 1,300 per semester' }
-      }
-    },
-    {
-      id: 7,
-      name: 'Imperial College London',
-      location: 'London, UK',
-      province: 'England',
-      region: 'Europe',
-      description: 'Science-based institution',
-      image: 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=800',
-      details: {
-        overview: 'Founded in 1907, Imperial College London is a science-based university in London',
-        details: ['Located in London, England', 'Specialized in science, engineering, medicine, and business', 'Known for research excellence', 'Strong industry partnerships'],
-        courses: [
-          { name: 'Computing', details: 'Study of computer science' },
-          { name: 'Mechanical Engineering', details: 'Study of mechanical systems' },
-          { name: 'Medicine', details: 'Study of medical sciences' },
-          { name: 'Business', details: 'Study of business administration' }
-        ],
-        requirements: ['A-levels or equivalent', 'Personal statement', 'Academic references', 'Admissions test'],
-        prices: { undergraduate: '£9,250 per year (UK)', graduate: '£15,000 - £35,000 per year' }
-      }
-    },
-    {
-      id: 8,
-      name: 'National University of Singapore',
-      location: 'Singapore',
-      province: 'Singapore',
-      region: 'Asia',
-      description: 'Leading Asian university',
-      image: 'https://images.unsplash.com/photo-1525635313341-29744db9f37d?w=800',
-      details: {
-        overview: 'Founded in 1905, NUS is Singapore\'s flagship university',
-        details: ['Located in Singapore', 'Known for academic excellence in Asia', 'Strong research focus', 'International student body'],
-        courses: [
-          { name: 'Computer Science', details: 'Study of computation and information' },
-          { name: 'Business', details: 'Study of business administration' },
-          { name: 'Engineering', details: 'Study of engineering disciplines' },
-          { name: 'Medicine', details: 'Study of medical sciences' }
-        ],
-        requirements: ['High school diploma', 'SAT/ACT or equivalent', 'Personal statement', 'Letters of recommendation'],
-        prices: { undergraduate: 'SGD 38,000 per year', graduate: 'SGD 40,000 - $50,000 per year' }
-      }
-    },
-    {
-      id: 9,
-      name: 'Tsinghua University',
-      location: 'Beijing, China',
-      province: 'Beijing',
-      region: 'Asia',
-      description: 'Leading Chinese university',
-      image: 'https://images.unsplash.com/photo-1509062522246-3755977927d7?w=800',
-      details: {
-        overview: 'Founded in 1911, Tsinghua is one of China\'s most prestigious universities',
-        details: ['Located in Beijing, China', 'Known for engineering and computer science', 'Strong government connections', 'Alumni include many Chinese leaders'],
-        courses: [
-          { name: 'Computer Science', details: 'Study of computation and information' },
-          { name: 'Engineering', details: 'Study of engineering disciplines' },
-          { name: 'Architecture', details: 'Study of architecture and design' },
-          { name: 'Economics', details: 'Study of economics' }
-        ],
-        requirements: ['High school diploma', 'Gaokao exam', 'Personal statement', 'Interview'],
-        prices: { undergraduate: 'CNY 5,000 per year', graduate: 'CNY 8,000 - $30,000 per year' }
-      }
-    },
-    {
-      id: 10,
-      name: 'University of Tokyo',
-      location: 'Tokyo, Japan',
-      province: 'Tokyo',
-      region: 'Asia',
-      description: 'Japan\'s top university',
-      image: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800',
-      details: {
-        overview: 'Founded in 1877, the University of Tokyo is Japan\'s most prestigious university',
-        details: ['Located in Tokyo, Japan', 'Known for research excellence', 'Strong in science and engineering', 'Many Nobel laureates among alumni'],
-        courses: [
-          { name: 'Engineering', details: 'Study of engineering disciplines' },
-          { name: 'Science', details: 'Study of natural sciences' },
-          { name: 'Medicine', details: 'Study of medical sciences' },
-          { name: 'Economics', details: 'Study of economics' }
-        ],
-        requirements: ['High school diploma', 'Entrance exam', 'Personal statement', 'Interview'],
-        prices: { undergraduate: 'JPY 535,800 per year', graduate: 'JPY 535,800 per year' }
-      }
-    },
-    {
-      id: 11,
-      name: 'Peking University',
-      location: 'Beijing, China',
-      province: 'Beijing',
-      region: 'Asia',
-      description: 'Historic Chinese university',
-      image: 'https://images.unsplash.com/photo-1577896851231-70ef18881754?w=800',
-      details: {
-        overview: 'Founded in 1898, Peking University is one of China\'s oldest and most prestigious universities',
-        details: ['Located in Beijing, China', 'Known for humanities and social sciences', 'Beautiful campus with traditional Chinese architecture', 'Alumni include many Chinese leaders'],
-        courses: [
-          { name: 'Chinese Literature', details: 'Study of Chinese literature' },
-          { name: 'History', details: 'Study of history' },
-          { name: 'Philosophy', details: 'Study of philosophy' },
-          { name: 'Economics', details: 'Study of economics' }
-        ],
-        requirements: ['High school diploma', 'Gaokao exam', 'Personal statement', 'Interview'],
-        prices: { undergraduate: 'CNY 5,000 per year', graduate: 'CNY 8,000 - $30,000 per year' }
-      }
-    },
-    {
-      id: 12,
-      name: 'Australian National University',
-      location: 'Canberra, Australia',
-      province: 'Australian Capital Territory',
-      region: 'Oceania',
-      description: 'National research university',
-      image: 'https://images.unsplash.com/photo-1555861496-0666c8981751?w=800',
-      details: {
-        overview: 'Founded in 1946, ANU is Australia\'s national university',
-        details: ['Located in Canberra, Australia', 'Known for research excellence', 'Strong in science and policy', 'Beautiful campus'],
-        courses: [
-          { name: 'Science', details: 'Study of natural sciences' },
-          { name: 'Engineering', details: 'Study of engineering disciplines' },
-          { name: 'Law', details: 'Study of legal systems' },
-          { name: 'Medicine', details: 'Study of medical sciences' }
-        ],
-        requirements: ['High school diploma', 'ATAR score', 'Personal statement', 'Letters of recommendation'],
-        prices: { undergraduate: 'AUD 34,000 per year', graduate: 'AUD 37,000 - $45,000 per year' }
-      }
-    },
-    {
-      id: 13,
-      name: 'University of Melbourne',
-      location: 'Melbourne, Australia',
-      province: 'Victoria',
-      region: 'Oceania',
-      description: 'Australia\'s top university',
-      image: 'https://images.unsplash.com/photo-1577896851231-70ef18881754?w=800',
-      details: {
-        overview: 'Founded in 1853, the University of Melbourne is Australia\'s oldest university',
-        details: ['Located in Melbourne, Australia', 'Known for academic excellence', 'Strong research focus', 'Beautiful campus'],
-        courses: [
-          { name: 'Arts', details: 'Study of humanities and arts' },
-          { name: 'Science', details: 'Study of natural sciences' },
-          { name: 'Engineering', details: 'Study of engineering disciplines' },
-          { name: 'Medicine', details: 'Study of medical sciences' }
-        ],
-        requirements: ['High school diploma', 'ATAR score', 'Personal statement', 'Letters of recommendation'],
-        prices: { undergraduate: 'AUD 30,000 - $45,000 per year', graduate: 'AUD 35,000 - $50,000 per year' }
-      }
-    },
-    {
-      id: 14,
-      name: 'University of Sydney',
-      location: 'Sydney, Australia',
-      province: 'New South Wales',
-      region: 'Oceania',
-      description: 'Leading Australian university',
-      image: 'https://images.unsplash.com/photo-1555861496-0666c8981751?w=800',
-      details: {
-        overview: 'Founded in 1850, the University of Sydney is Australia\'s first university',
-        details: ['Located in Sydney, Australia', 'Historic campus', 'Known for academic excellence', 'Strong research programs'],
-        courses: [
-          { name: 'Arts', details: 'Study of humanities and arts' },
-          { name: 'Science', details: 'Study of natural sciences' },
-          { name: 'Engineering', details: 'Study of engineering disciplines' },
-          { name: 'Law', details: 'Study of legal systems' }
-        ],
-        requirements: ['High school diploma', 'ATAR score', 'Personal statement', 'Letters of recommendation'],
-        prices: { undergraduate: 'AUD 32,000 - $48,000 per year', graduate: 'AUD 38,000 - $55,000 per year' }
-      }
-    },
-    {
-      id: 15,
-      name: 'University of São Paulo',
-      location: 'São Paulo, Brazil',
-      province: 'São Paulo',
-      region: 'South America',
-      description: 'Brazil\'s largest university',
-      image: 'https://images.unsplash.com/photo-1483729558449-99ef09a8c325?w=800',
-      details: {
-        overview: 'Founded in 1934, USP is Brazil\'s largest university',
-        details: ['Located in São Paulo, Brazil', 'Public university with no tuition fees', 'Known for research excellence', 'Large student body'],
-        courses: [
-          { name: 'Engineering', details: 'Study of engineering disciplines' },
-          { name: 'Medicine', details: 'Study of medical sciences' },
-          { name: 'Law', details: 'Study of legal systems' },
-          { name: 'Economics', details: 'Study of economics' }
-        ],
-        requirements: ['High school diploma', 'ENEM exam', 'Personal statement', 'Interview'],
-        prices: { undergraduate: 'Free (public university)', graduate: 'Free (public university)' }
-      }
-    },
-    {
-      id: 16,
-      name: 'University of Buenos Aires',
-      location: 'Buenos Aires, Argentina',
-      province: 'Buenos Aires',
-      region: 'South America',
-      description: 'Argentina\'s top university',
-      image: 'https://images.unsplash.com/photo-1518391846015-55a9cc003b25?w=800',
-      details: {
-        overview: 'Founded in 1821, UBA is Argentina\'s largest and most prestigious university',
-        details: ['Located in Buenos Aires, Argentina', 'Public university with no tuition fees', 'Known for academic excellence', 'Many Nobel laureates among alumni'],
-        courses: [
-          { name: 'Medicine', details: 'Study of medical sciences' },
-          { name: 'Law', details: 'Study of legal systems' },
-          { name: 'Engineering', details: 'Study of engineering disciplines' },
-          { name: 'Economics', details: 'Study of economics' }
-        ],
-        requirements: ['High school diploma', 'Entrance exam', 'Personal statement'],
-        prices: { undergraduate: 'Free (public university)', graduate: 'Free (public university)' }
-      }
-    },
-    {
-      id: 17,
-      name: 'University of Cape Town',
-      location: 'Cape Town, South Africa',
-      province: 'Western Cape',
-      region: 'Africa',
-      description: 'Africa\'s leading university',
-      image: 'https://images.unsplash.com/photo-1580060839134-75a5edca2e99?w=800',
-      details: {
-        overview: 'Founded in 1829, UCT is South Africa\'s oldest university',
-        details: ['Located in Cape Town, South Africa', 'Beautiful campus with mountain views', 'Known for academic excellence', 'Strong research programs'],
-        courses: [
-          { name: 'Commerce', details: 'Study of business and commerce' },
-          { name: 'Science', details: 'Study of natural sciences' },
-          { name: 'Engineering', details: 'Study of engineering disciplines' },
-          { name: 'Humanities', details: 'Study of humanities' }
-        ],
-        requirements: ['High school diploma', 'NSC exam results', 'Personal statement', 'Letters of recommendation'],
-        prices: { undergraduate: 'ZAR 50,000 - $80,000 per year', graduate: 'ZAR 60,000 - $100,000 per year' }
-      }
-    },
-    {
-      id: 18,
-      name: 'Stellenbosch University',
-      location: 'Stellenbosch, South Africa',
-      province: 'Western Cape',
-      region: 'Africa',
-      description: 'Top South African university',
-      image: 'https://images.unsplash.com/photo-1580060839134-75a5edca2e99?w=800',
-      details: {
-        overview: 'Founded in 1918, Stellenbosch University is one of South Africa\'s top universities',
-        details: ['Located in Stellenbosch, South Africa', 'Known for wine research', 'Beautiful campus in wine region', 'Strong academic programs'],
-        courses: [
-          { name: 'Agricultural Sciences', details: 'Study of agriculture' },
-          { name: 'Science', details: 'Study of natural sciences' },
-          { name: 'Engineering', details: 'Study of engineering disciplines' },
-          { name: 'Business', details: 'Study of business administration' }
-        ],
-        requirements: ['High school diploma', 'NSC exam results', 'Personal statement', 'Letters of recommendation'],
-        prices: { undergraduate: 'ZAR 45,000 - $75,000 per year', graduate: 'ZAR 55,000 - $95,000 per year' }
-      }
-    },
-  ],
-  regions: ['North America', 'Europe', 'Asia', 'Oceania', 'South America', 'Africa'],
-  users: [
-    { id: 1, name: 'Kai', email: 'kai@example.com', role: 'admin', createdAt: '2024-01-01', permissions: [...ALL_PERMISSIONS] },
-  ],
-  roles: [
-    { id: 1, name: 'admin', permissions: [...ALL_PERMISSIONS], isSystem: true },
-    { id: 2, name: 'user', permissions: [], isSystem: true },
-  ],
-  settings: { appName: 'UniVerse', appIcon: '' },
-  activityLog: [],
-  versions: {},
-  trash: [],
-  bookmarks: [],
-};
-
-const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v));
-
-function rolePerms(role: string, roles?: Role[]): string[] {
-  const r = roles ? roles.find(x => x.name === role) : undefined;
-  return r ? [...r.permissions] : (role === 'admin' ? [...ALL_PERMISSIONS] : []);
-}
-
-function normalizeUser(u: any, roles?: Role[]) {
-  const known = roles ? roles.some(x => x.name === u.role) : (u.role === 'admin' || u.role === 'user');
-  const role = known ? u.role : (u.role === 'admin' ? 'admin' : 'user');
-  return {
-    id: u.id ?? Date.now(),
-    name: u.name || 'User',
-    email: u.email || '',
-    role,
-    createdAt: u.createdAt || new Date().toISOString().slice(0, 10),
-    permissions: Array.isArray(u.permissions) ? u.permissions : rolePerms(role, roles),
-  };
-}
-
-function loadDb(): DbShape {
-  try {
-    if (existsSync(DB_FILE)) {
-      const parsed = JSON.parse(readFileSync(DB_FILE, 'utf-8'));
-      const seedRoles = clone(seedDb.roles);
-      const parsedRoles = Array.isArray(parsed.roles) && parsed.roles.length ? parsed.roles : seedRoles;
-      const rolesList: Role[] = parsedRoles.map((r: any) => ({
-        id: r.id ?? Date.now(),
-        name: r.name || 'role',
-        permissions: Array.isArray(r.permissions) ? r.permissions : [],
-        isSystem: !!r.isSystem,
-      }));
-      return {
-        universities: (Array.isArray(parsed.universities) ? parsed.universities : clone(seedDb.universities)).map(enrichUniversity),
-        regions: Array.isArray(parsed.regions) ? parsed.regions : [...seedDb.regions],
-        users: (Array.isArray(parsed.users) ? parsed.users : clone(seedDb.users)).map(u => normalizeUser(u, rolesList)),
-        roles: rolesList,
-        settings: { ...seedDb.settings, ...(parsed.settings || {}) },
-        activityLog: Array.isArray(parsed.activityLog) ? parsed.activityLog : [],
-        versions: parsed.versions && typeof parsed.versions === 'object' ? parsed.versions : {},
-        trash: Array.isArray(parsed.trash) ? parsed.trash : [],
-        bookmarks: Array.isArray(parsed.bookmarks) ? parsed.bookmarks : [],
-      };
-    }
-  } catch (err) {
-    console.error('Failed to read data/db.json, using seed data:', err);
-  }
-  const seeded = clone(seedDb);
-  seeded.universities = seeded.universities.map(enrichUniversity);
-  return seeded;
-}
-
-function saveDb() {
-  if (!existsSync(DATA_DIR)) {
-    mkdirSync(DATA_DIR, { recursive: true });
-  }
-  writeFileSync(DB_FILE, JSON.stringify(db, null, 2), 'utf-8');
-}
-
-let db: DbShape = loadDb();
-
-// ---------------------------------------------------------------------------
-// Enrichment: deterministic defaults for ranking/scholarship/deadline/etc.
-// so every university has full public-page data without hand-writing it.
-// ---------------------------------------------------------------------------
-
-function enrichUniversity(u: any): any {
-  const id = u.id || 0;
-  const courses = Array.isArray(u.details?.courses) ? u.details.courses.map((c: any) => c.name || '') : [];
-
-  if (!u.rankings) {
-    const programs: Record<string, number> = {};
-    courses.slice(0, 4).forEach((name: string, i: number) => {
-      programs[name] = ((i * 13 + id) % 55) + 1;
-    });
-    u.rankings = { overall: (id % 48) + 3, programs };
-  }
-
-  if (!u.pros) {
-    const pool = [
-      'World-class reputation and faculty',
-      'Strong research output and funding',
-      'Excellent global alumni network',
-      'Prime location with great campus life',
-      'Diverse, international community',
-      'Generous scholarship opportunities',
-    ];
-    u.pros = [pool[id % pool.length], pool[(id + 2) % pool.length], pool[(id + 4) % pool.length]];
-  }
-
-  if (!u.cons) {
-    const pool = [
-      'High tuition and living costs',
-      'Highly competitive admissions',
-      'Large class sizes in popular programs',
-      'Limited on-campus housing',
-      'Heavy workload and academic pressure',
-      'Expensive city to live in',
-    ];
-    u.cons = [pool[(id + 1) % pool.length], pool[(id + 3) % pool.length], pool[(id + 5) % pool.length]];
-  }
-
-  if (!u.scholarships) {
-    u.scholarships = [
-      { name: 'Merit Scholarship', amount: '$10,000 / year', eligibility: 'Top 10% academic performance' },
-      { name: 'International Excellence Award', amount: 'Up to 50% tuition', eligibility: 'International students with strong grades' },
-    ];
-  }
-
-  if (!u.applicationDeadlines) {
-    u.applicationDeadlines = [
-      { window: 'Fall 2027', deadline: '2027-01-05' },
-      { window: 'Fall 2026', deadline: '2026-11-15' },
-      { window: 'Spring 2027', deadline: '2026-08-01' },
-    ];
-  }
-
-  if (!u.costOfLiving) {
-    u.costOfLiving = { currency: 'USD', monthly: '$1,200 – $2,400' };
-  }
-
-  if (!u.visa) {
-    u.visa = {
-      processTime: '4–8 weeks',
-      requirements: [
-        'Valid passport (6+ months)',
-        'Letter of admission',
-        'Proof of financial support',
-        'Visa application form and fee',
-      ],
-    };
-  }
-
-  return u;
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-let logId = Date.now();
-let trashId = Date.now() + 100000;
-let bookmarkId = Date.now() + 200000;
-
-function now() {
-  return new Date().toISOString();
-}
 
 function actorOf(body: any): string {
   return (body && body.actor) || 'admin';
 }
 
-function logActivity(action: string, entity: string, entityId: string | number, entityName: string, actor: string, meta?: any) {
-  db.activityLog.unshift({
-    id: ++logId,
-    action,
-    entity,
-    entityId: String(entityId),
-    entityName,
-    actor,
-    timestamp: now(),
-    meta,
-  });
-  if (db.activityLog.length > 300) db.activityLog.length = 300;
+function requireSuperAdmin(body: any) {
+  const role = (body && body.actorRole) || '';
+  if (role !== 'super_admin') {
+    throw new ForbiddenException('Super Admin access required');
+  }
 }
 
-function pushVersion(uni: any, actor: string, summary: string) {
-  const key = String(uni.id);
-  const list = db.versions[key] || [];
-  const nextVersion = list.length ? list[list.length - 1].version + 1 : 1;
-  list.push({
-    version: nextVersion,
-    snapshot: clone(uni),
-    timestamp: now(),
-    actor,
-    summary,
-  });
-  if (list.length > 20) list.splice(0, list.length - 20);
-  db.versions[key] = list;
-  return nextVersion;
+function isSuperAdmin(body: any): boolean {
+  return (body && body.actorRole) === 'super_admin';
+}
+
+/** Strips secrets from any object before it leaves the API. */
+function stripSecrets(obj: any): any {
+  if (!obj || typeof obj !== 'object') return obj;
+  const { passwordHash: _ph, ...rest } = obj;
+  return rest;
+}
+
+// ---------------------------------------------------------------------------
+// Report time-series helpers (daily / weekly / monthly / yearly)
+// ---------------------------------------------------------------------------
+
+type Period = 'daily' | 'weekly' | 'monthly' | 'yearly';
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+function weekOf(d: Date): number {
+  const start = new Date(d.getFullYear(), 0, 1);
+  return Math.floor((d.getTime() - start.getTime()) / (7 * 86400000)) + 1;
+}
+
+function bucketKey(period: Period, d: Date): string {
+  if (period === 'daily') return `d:${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+  if (period === 'weekly') return `w:${d.getFullYear()}-${weekOf(d)}`;
+  if (period === 'monthly') return `m:${d.getFullYear()}-${d.getMonth()}`;
+  return `y:${d.getFullYear()}`;
+}
+
+function bucketLabel(period: Period, d: Date): string {
+  if (period === 'daily') return `${MONTHS[d.getMonth()]} ${d.getDate()}`;
+  if (period === 'weekly') return `Wk ${weekOf(d)}`;
+  if (period === 'monthly') return `${MONTHS[d.getMonth()]} ${String(d.getFullYear()).slice(2)}`;
+  return String(d.getFullYear());
+}
+
+function buildBuckets(period: Period) {
+  const now = new Date();
+  const count = period === 'yearly' ? 5 : 12;
+  const buckets: { key: string; label: string }[] = [];
+  for (let i = count - 1; i >= 0; i--) {
+    const d = new Date(now);
+    if (period === 'daily') d.setDate(now.getDate() - i);
+    else if (period === 'weekly') d.setDate(now.getDate() - i * 7);
+    else if (period === 'monthly') d.setMonth(now.getMonth() - i);
+    else d.setFullYear(now.getFullYear() - i);
+    buckets.push({ key: bucketKey(period, d), label: bucketLabel(period, d) });
+  }
+  return buckets;
 }
 
 @Controller('admin')
 export class AdminController {
+  constructor(
+    @InjectRepository(UniversityEntity)
+    private readonly universities: Repository<UniversityEntity>,
+    @InjectRepository(RegionEntity)
+    private readonly regions: Repository<RegionEntity>,
+    @InjectRepository(UserEntity)
+    private readonly users: Repository<UserEntity>,
+    @InjectRepository(RoleEntity)
+    private readonly rolesRepo: Repository<RoleEntity>,
+    @InjectRepository(SettingsEntity)
+    private readonly settings: Repository<SettingsEntity>,
+    @InjectRepository(ActivityLogEntity)
+    private readonly activity: Repository<ActivityLogEntity>,
+    @InjectRepository(VersionEntity)
+    private readonly versions: Repository<VersionEntity>,
+    @InjectRepository(TrashItemEntity)
+    private readonly trash: Repository<TrashItemEntity>,
+    @InjectRepository(BookmarkEntity)
+    private readonly bookmarks: Repository<BookmarkEntity>,
+    @InjectRepository(ReviewEntity)
+    private readonly reviews: Repository<ReviewEntity>,
+    @InjectRepository(ApplicationEntity)
+    private readonly applications: Repository<ApplicationEntity>,
+    @InjectRepository(UserPreferencesEntity)
+    private readonly preferences: Repository<UserPreferencesEntity>,
+    @InjectRepository(AcademicScoreEntity)
+    private readonly scores: Repository<AcademicScoreEntity>,
+    @InjectRepository(RecommendationEntity)
+    private readonly recommendations: Repository<RecommendationEntity>,
+    @InjectRepository(ProgramEntity)
+    private readonly programs: Repository<ProgramEntity>,
+    @InjectRepository(UniversityRequirementEntity)
+    private readonly requirements: Repository<UniversityRequirementEntity>,
+    @InjectRepository(ScholarshipEntity)
+    private readonly scholarships: Repository<ScholarshipEntity>,
+    private readonly dataSource: DataSource,
+  ) {}
+
   // ---------------- Universities ----------------
+
   @Get('universities')
-  getUniversities() {
-    return db.universities;
+  async getUniversities() {
+    return this.universities.find({ order: { id: 'ASC' } });
   }
 
   @Post('universities')
-  createUniversity(@Body() body: any) {
+  async createUniversity(@Body() body: any) {
     const actor = actorOf(body);
-    const newUni = {
-      id: Date.now(),
+    const university = enrichUniversity({
       name: body.name || 'Untitled University',
       location: body.location || '',
       province: body.province || '',
@@ -682,506 +174,834 @@ export class AdminController {
         requirements: [],
         prices: { undergraduate: '', graduate: '' },
       },
-    };
-    db.universities.push(newUni);
-    pushVersion(newUni, actor, 'Created');
-    logActivity('created', 'university', newUni.id, newUni.name, actor);
-    saveDb();
-    return newUni;
+      createdBy: actor,
+      updatedBy: actor,
+    });
+    const saved = await this.universities.save(university);
+    await this.syncUniversityRelations(saved);
+    await this.pushVersion(saved, actor, 'Created');
+    await this.logActivity('created', 'university', saved.id, saved.name, actor);
+    return saved;
   }
 
   @Put('universities/:id')
-  updateUniversity(@Param('id') id: string, @Body() body: any) {
+  async updateUniversity(@Param('id') id: string, @Body() body: any) {
     const actor = actorOf(body);
-    const index = db.universities.findIndex(u => u.id === parseInt(id));
-    if (index === -1) {
-      throw new Error('University not found');
-    }
-    const previous = db.universities[index];
-    db.universities[index] = { ...previous, ...body };
-    const version = pushVersion(db.universities[index], actor, body._summary || 'Edited');
-    logActivity('edited', 'university', id, db.universities[index].name, actor, { version });
-    saveDb();
-    return db.universities[index];
+    const existing = await this.universities.findOne({ where: { id: parseInt(id, 10) } });
+    if (!existing) throw new NotFoundException('University not found');
+
+    const { _summary, id: _id, createdAt: _createdAt, ...rest } = body;
+    const merged = enrichUniversity({
+      ...existing,
+      ...rest,
+      updatedBy: actor,
+    });
+    const saved = await this.universities.save(merged);
+    await this.syncUniversityRelations(saved);
+    await this.pushVersion(saved, actor, _summary || 'Edited');
+    await this.logActivity('edited', 'university', id, saved.name, actor, { version: saved.updatedAt });
+    return saved;
   }
 
   @Delete('universities/:id')
-  deleteUniversity(@Param('id') id: string, @Body() body: any) {
+  async deleteUniversity(@Param('id') id: string, @Body() body: any) {
     const actor = actorOf(body);
-    const index = db.universities.findIndex(u => u.id === parseInt(id));
-    if (index === -1) {
-      throw new Error('University not found');
-    }
-    const [deleted] = db.universities.splice(index, 1);
-    const tid = ++trashId;
-    db.trash.push({
-      id: tid,
+    const existing = await this.universities.findOne({ where: { id: parseInt(id, 10) } });
+    if (!existing) throw new NotFoundException('University not found');
+
+    await this.trash.save({
       type: 'university',
-      item: deleted,
-      deletedAt: now(),
+      item: { ...existing },
       deletedBy: actor,
     });
-    logActivity('deleted', 'university', id, deleted.name, actor, { trashId: tid });
-    saveDb();
-    return deleted;
+    await this.universities.delete(existing.id);
+    await this.logActivity('deleted', 'university', id, existing.name, actor);
+    return existing;
   }
 
   @Post('universities/:id/revert/:version')
-  revertUniversity(@Param('id') id: string, @Param('version') version: string, @Body() body: any) {
+  async revertUniversity(
+    @Param('id') id: string,
+    @Param('version') version: string,
+    @Body() body: any,
+  ) {
     const actor = actorOf(body);
-    const key = String(parseInt(id));
-    const list = db.versions[key] || [];
-    const target = list.find(v => v.version === parseInt(version));
-    if (!target) {
-      throw new Error('Version not found');
-    }
-    const index = db.universities.findIndex(u => u.id === parseInt(id));
-    if (index === -1) {
-      throw new Error('University not found');
-    }
+    const uniId = parseInt(id, 10);
+    const existing = await this.universities.findOne({ where: { id: uniId } });
+    if (!existing) throw new NotFoundException('University not found');
+
+    const target = await this.versions.findOne({
+      where: { universityId: uniId, version: parseInt(version, 10) },
+    });
+    if (!target) throw new NotFoundException('Version not found');
+
     // Keep a copy of the current state as the newest version before reverting
-    pushVersion(db.universities[index], actor, 'Auto-saved before revert');
-    const restored = { ...db.universities[index], ...clone(target.snapshot) };
-    db.universities[index] = restored;
-    logActivity('reverted', 'university', id, restored.name, actor, { version: target.version });
-    saveDb();
-    return restored;
+    await this.pushVersion(existing, actor, 'Auto-saved before revert');
+
+    const restored = enrichUniversity({
+      ...existing,
+      ...target.snapshot,
+      updatedBy: actor,
+    });
+    const saved = await this.universities.save(restored);
+    await this.syncUniversityRelations(saved);
+    await this.logActivity('reverted', 'university', id, saved.name, actor, { version: target.version });
+    return saved;
   }
 
   // ---------------- Versions ----------------
+
   @Get('versions')
-  getVersions() {
-    const names = new Map(db.universities.map(u => [String(u.id), u.name]));
+  async getVersions() {
+    const rows = await this.versions.find({ order: { id: 'ASC' } });
+    const unis = await this.universities.find();
+    const names = new Map(unis.map((u) => [u.id, u.name]));
+    const grouped = new Map<number, any[]>();
+    rows.forEach((row) => {
+      if (!grouped.has(row.universityId)) grouped.set(row.universityId, []);
+      grouped.get(row.universityId)!.push(row);
+    });
     const result: any[] = [];
-    Object.keys(db.versions).forEach(key => {
+    grouped.forEach((list, uniId) => {
       result.push({
-        universityId: parseInt(key),
-        universityName: names.get(key) || `University ${key}`,
-        versions: db.versions[key],
+        universityId: uniId,
+        universityName: names.get(uniId) || `University ${uniId}`,
+        versions: list,
       });
     });
     return result.sort((a, b) => b.universityId - a.universityId);
   }
 
   // ---------------- Trash (soft-deleted items) ----------------
+
   @Get('trash')
-  getTrash() {
-    return db.trash;
+  async getTrash() {
+    const rows = await this.trash.find({ order: { id: 'DESC' } });
+    return rows.map((r) => ({ ...r, item: stripSecrets(r.item) }));
   }
 
   @Post('trash/:id/restore')
-  restoreTrashItem(@Param('id') id: string, @Body() body: any) {
+  async restoreTrashItem(@Param('id') id: string, @Body() body: any) {
+    requireSuperAdmin(body);
     const actor = actorOf(body);
-    const index = db.trash.findIndex(t => t.id === parseInt(id));
-    if (index === -1) {
-      throw new Error('Trash item not found');
-    }
-    const [entry] = db.trash.splice(index, 1);
+    const entry = await this.trash.findOne({ where: { id: parseInt(id, 10) } });
+    if (!entry) throw new NotFoundException('Trash item not found');
+
     if (entry.type === 'user') {
-      db.users.push(normalizeUser(entry.item));
+      // normalizeUser drops secrets — restore the stored password hash so the
+      // account keeps working after a revert.
+      const restored = normalizeUser(entry.item, await this.rolesRepo.find());
+      await this.users.save({
+        ...restored,
+        ...(entry.item?.passwordHash ? { passwordHash: entry.item.passwordHash } : {}),
+      });
     } else {
-      db.universities.push(entry.item);
+      const restoredUni = await this.universities.save(enrichUniversity({ ...entry.item }));
+      await this.syncUniversityRelations(restoredUni);
     }
-    logActivity('reverted', entry.type, entry.item.id, entry.item.name || entry.item.email || 'item', actor, { restored: true });
-    saveDb();
-    return entry.item;
+    await this.trash.delete(entry.id);
+    await this.logActivity(
+      'reverted',
+      entry.type,
+      entry.item?.id ?? '',
+      entry.item?.name || entry.item?.email || 'item',
+      actor,
+      { restored: true },
+    );
+    return stripSecrets(entry.item);
   }
 
   @Delete('trash/:id')
-  permanentlyDeleteTrashItem(@Param('id') id: string, @Body() body: any) {
+  async permanentlyDeleteTrashItem(@Param('id') id: string, @Body() body: any) {
+    requireSuperAdmin(body);
     const actor = actorOf(body);
-    const index = db.trash.findIndex(t => t.id === parseInt(id));
-    if (index === -1) {
-      throw new Error('Trash item not found');
-    }
-    const [entry] = db.trash.splice(index, 1);
-    // Drop version history for permanently deleted content
+    const entry = await this.trash.findOne({ where: { id: parseInt(id, 10) } });
+    if (!entry) throw new NotFoundException('Trash item not found');
+
     if (entry.type === 'university') {
-      delete db.versions[String(entry.item.id)];
+      await this.versions.delete({ universityId: entry.item?.id });
     }
-    logActivity('permanently_deleted', entry.type, entry.item.id, entry.item.name || entry.item.email || 'item', actor);
-    saveDb();
+    await this.trash.delete(entry.id);
+    await this.logActivity(
+      'permanently_deleted',
+      entry.type,
+      entry.item?.id ?? '',
+      entry.item?.name || entry.item?.email || 'item',
+      actor,
+    );
     return entry.item;
   }
 
   // ---------------- Regions ----------------
+
   @Get('regions')
-  getRegions() {
-    return db.regions;
+  async getRegions() {
+    const rows = await this.regions.find({ order: { id: 'ASC' } });
+    return rows.map((r) => r.name);
   }
 
   @Post('regions')
-  createRegion(@Body() body: any) {
+  async createRegion(@Body() body: any) {
     const actor = actorOf(body);
     const name = (body.name || '').trim();
-    if (!name) {
-      throw new Error('Region name cannot be empty');
-    }
-    if (db.regions.includes(name)) {
-      throw new Error('Region already exists');
-    }
-    db.regions.push(name);
-    logActivity('created', 'region', name, name, actor);
-    saveDb();
+    if (!name) throw new BadRequestException('Region name cannot be empty');
+    const exists = await this.regions.findOne({ where: { name } });
+    if (exists) throw new BadRequestException('Region already exists');
+
+    await this.regions.save({ name });
+    await this.logActivity('created', 'region', name, name, actor);
     return { name };
   }
 
   @Put('regions/:name')
-  renameRegion(@Param('name') name: string, @Body() body: any) {
+  async renameRegion(@Param('name') name: string, @Body() body: any) {
     const actor = actorOf(body);
-    const index = db.regions.indexOf(name);
-    if (index === -1) {
-      throw new Error('Region not found');
-    }
+    const row = await this.regions.findOne({ where: { name } });
+    if (!row) throw new NotFoundException('Region not found');
+
     const newName = (body.name || '').trim();
-    if (!newName) {
-      throw new Error('Region name cannot be empty');
+    if (!newName) throw new BadRequestException('Region name cannot be empty');
+    if (newName !== name) {
+      const clash = await this.regions.findOne({ where: { name: newName } });
+      if (clash) throw new BadRequestException('Region already exists');
     }
-    if (newName !== name && db.regions.includes(newName)) {
-      throw new Error('Region already exists');
-    }
-    db.regions[index] = newName;
-    db.universities.forEach(u => {
-      if (u.region === name) {
-        u.region = newName;
-      }
-    });
-    logActivity('edited', 'region', newName, newName, actor, { from: name });
-    saveDb();
-    return db.regions;
+
+    row.name = newName;
+    await this.regions.save(row);
+    await this.universities.update({ region: name }, { region: newName });
+    await this.logActivity('edited', 'region', newName, newName, actor, { from: name });
+    return this.getRegions();
   }
 
   @Delete('regions/:name')
-  deleteRegion(@Param('name') name: string, @Body() body: any) {
+  async deleteRegion(@Param('name') name: string, @Body() body: any) {
     const actor = actorOf(body);
-    const index = db.regions.indexOf(name);
-    if (index === -1) {
-      throw new Error('Region not found');
-    }
-    const [deleted] = db.regions.splice(index, 1);
-    logActivity('deleted', 'region', name, name, actor);
-    saveDb();
-    return { name: deleted };
+    const row = await this.regions.findOne({ where: { name } });
+    if (!row) throw new NotFoundException('Region not found');
+
+    await this.regions.delete(row.id);
+    await this.logActivity('deleted', 'region', name, name, actor);
+    return { name };
   }
 
   // ---------------- Users ----------------
+
   @Get('users')
-  getUsers() {
-    return db.users;
+  async getUsers() {
+    return this.users.find({ order: { id: 'ASC' } });
   }
 
   @Post('users')
-  createUser(@Body() body: any) {
+  async createUser(@Body() body: any) {
     const actor = actorOf(body);
-    const role = body.role && db.roles.some(r => r.name === body.role) ? body.role : 'user';
-    const user = normalizeUser(
-      {
-        name: body.name || 'User',
-        email: body.email || '',
-        role,
-        permissions: rolePerms(role, db.roles),
-      },
-      db.roles
-    );
-    if (db.users.some(u => u.email && u.email === user.email)) {
-      throw new Error('User with this email already exists');
+    const roles = await this.rolesRepo.find();
+    // Only a Super Admin may create privileged (non-user) accounts
+    if (body.role && body.role !== 'user' && !isSuperAdmin(body)) {
+      throw new ForbiddenException('Only Super Admins can create privileged accounts');
     }
-    db.users.push(user);
-    logActivity('created', 'user', user.id, user.email || user.name, actor);
-    saveDb();
-    return user;
+    const role = body.role && roles.some((r) => r.name === body.role) ? body.role : 'user';
+    const user = normalizeUser(
+      { name: body.name || 'User', email: body.email || '', role, permissions: rolePerms(role, roles) },
+      roles,
+    );
+    const clash = await this.users.findOne({ where: { email: user.email } });
+    if (clash) throw new BadRequestException('User with this email already exists');
+
+    const saved = await this.users.save(user);
+    await this.logActivity('created', 'user', saved.id, saved.email || saved.name, actor);
+    return saved;
   }
 
   @Put('users/:id')
-  updateUser(@Param('id') id: string, @Body() body: any) {
+  async updateUser(@Param('id') id: string, @Body() body: any) {
     const actor = actorOf(body);
-    const index = db.users.findIndex(u => u.id === parseInt(id));
-    if (index === -1) {
-      throw new Error('User not found');
+    const existing = await this.users.findOne({ where: { id: parseInt(id, 10) } });
+    if (!existing) throw new NotFoundException('User not found');
+
+    // Only a Super Admin may touch a Super Admin account
+    if (existing.role === 'super_admin' && !isSuperAdmin(body)) {
+      throw new ForbiddenException('Only Super Admins can modify Super Admin accounts');
     }
-    const previous = db.users[index];
-    if (body.role !== undefined && !db.roles.some(r => r.name === body.role)) {
-      throw new Error('Unknown role: ' + body.role);
+    // Only a Super Admin may grant the Super Admin role
+    if (body.role === 'super_admin' && !isSuperAdmin(body)) {
+      throw new ForbiddenException('Only Super Admins can grant the Super Admin role');
     }
-    const merged = {
-      ...previous,
-      ...(body.name !== undefined ? { name: body.name } : {}),
-      ...(body.email !== undefined ? { email: body.email } : {}),
-      ...(body.role !== undefined ? { role: body.role } : {}),
-    };
-    db.users[index] = normalizeUser({ ...merged, permissions: rolePerms(merged.role, db.roles) }, db.roles);
-    const changed = ['name', 'email', 'role'].filter(k => body[k] !== undefined && body[k] !== previous[k]);
-    logActivity('edited', 'user', id, db.users[index].email || db.users[index].name, actor, { changed });
-    saveDb();
-    return db.users[index];
+
+    const roles = await this.rolesRepo.find();
+    if (body.role !== undefined && !roles.some((r) => r.name === body.role)) {
+      throw new BadRequestException('Unknown role: ' + body.role);
+    }
+    // Only a Super Admin may assign roles at all (prevents creating an
+    // all-permissions role and self-assigning it)
+    if (body.role !== undefined && !isSuperAdmin(body)) {
+      throw new ForbiddenException('Only Super Admins can change user roles');
+    }
+    const role = body.role !== undefined ? body.role : existing.role;
+    const merged = normalizeUser(
+      {
+        ...existing,
+        ...(body.name !== undefined ? { name: body.name } : {}),
+        ...(body.email !== undefined ? { email: body.email } : {}),
+        role,
+        permissions: rolePerms(role, roles),
+      },
+      roles,
+    );
+    const saved = await this.users.save(merged);
+    const changed = ['name', 'email', 'role'].filter(
+      (k) => body[k] !== undefined && body[k] !== (existing as any)[k],
+    );
+    await this.logActivity('edited', 'user', id, saved.email || saved.name, actor, { changed });
+    return saved;
   }
 
   @Delete('users/:id')
-  deleteUser(@Param('id') id: string, @Body() body: any) {
+  async deleteUser(@Param('id') id: string, @Body() body: any) {
     const actor = actorOf(body);
-    const index = db.users.findIndex(u => u.id === parseInt(id));
-    if (index === -1) {
-      throw new Error('User not found');
+    const existing = await this.users
+      .createQueryBuilder('u')
+      .addSelect('u.passwordHash')
+      .where('u.id = :id', { id: parseInt(id, 10) })
+      .getOne();
+    if (!existing) throw new NotFoundException('User not found');
+
+    // Only a Super Admin may delete a Super Admin account
+    if (existing.role === 'super_admin' && !isSuperAdmin(body)) {
+      throw new ForbiddenException('Only Super Admins can delete Super Admin accounts');
     }
-    const [deleted] = db.users.splice(index, 1);
-    const tid = ++trashId;
-    db.trash.push({
-      id: tid,
+
+    await this.trash.save({
       type: 'user',
-      item: deleted,
-      deletedAt: now(),
+      item: { ...existing },
       deletedBy: actor,
     });
-    logActivity('deleted', 'user', id, deleted.email || deleted.name, actor, { trashId: tid });
-    saveDb();
-    return deleted;
+    await this.users.delete(existing.id);
+    // Clean up the user's personal data (preferences, scores, recommendations)
+    await this.preferences.delete({ userEmail: existing.email });
+    await this.scores.delete({ userEmail: existing.email });
+    await this.recommendations.delete({ userEmail: existing.email });
+    await this.logActivity('deleted', 'user', id, existing.email || existing.name, actor);
+    return stripSecrets(existing);
   }
 
   // ---------------- Roles ----------------
+
   @Get('roles')
-  getRoles() {
+  async getRoles() {
+    const roles = await this.rolesRepo.find({ order: { id: 'ASC' } });
+    const users = await this.users.find();
     return {
-      roles: db.roles.map(r => ({ ...r, userCount: db.users.filter(u => u.role === r.name).length })),
-      users: db.users,
+      roles: roles.map((r) => ({
+        ...r,
+        userCount: users.filter((u) => u.role === r.name).length,
+      })),
+      users,
     };
   }
 
   @Post('roles')
-  createRole(@Body() body: any) {
+  async createRole(@Body() body: any) {
+    requireSuperAdmin(body);
     const actor = actorOf(body);
     const name = (body.name || '').trim();
-    if (!name) {
-      throw new Error('Role name cannot be empty');
-    }
-    if (db.roles.some(r => r.name === name)) {
-      throw new Error('Role already exists');
-    }
-    const role: Role = {
-      id: Date.now(),
+    if (!name) throw new BadRequestException('Role name cannot be empty');
+    const exists = await this.rolesRepo.findOne({ where: { name } });
+    if (exists) throw new BadRequestException('Role already exists');
+
+    const role = await this.rolesRepo.save({
       name,
       permissions: Array.isArray(body.permissions) ? body.permissions : [],
       isSystem: false,
-    };
-    db.roles.push(role);
-    logActivity('created', 'role', role.id, name, actor);
-    saveDb();
+    });
+    await this.logActivity('created', 'role', role.id, name, actor);
     return role;
   }
 
   @Put('roles/:id')
-  updateRole(@Param('id') id: string, @Body() body: any) {
-    const actor = actorOf(body);
-    const index = db.roles.findIndex(r => r.id === parseInt(id));
-    if (index === -1) {
-      throw new Error('Role not found');
+  async updateRole(@Param('id') id: string, @Body() body: any) {
+    // Permission changes on roles are system-level — Super Admin only
+    if (body.permissions !== undefined && !isSuperAdmin(body)) {
+      throw new ForbiddenException('Only Super Admins can edit role permissions');
     }
-    const role = db.roles[index];
+    const actor = actorOf(body);
+    const role = await this.rolesRepo.findOne({ where: { id: parseInt(id, 10) } });
+    if (!role) throw new NotFoundException('Role not found');
+
     const oldName = role.name;
     if (body.name !== undefined) {
       const newName = String(body.name).trim();
-      if (!newName) {
-        throw new Error('Role name cannot be empty');
-      }
-      if (newName !== role.name && db.roles.some(r => r.name === newName)) {
-        throw new Error('Role already exists');
+      if (!newName) throw new BadRequestException('Role name cannot be empty');
+      if (newName !== role.name) {
+        const clash = await this.rolesRepo.findOne({ where: { name: newName } });
+        if (clash) throw new BadRequestException('Role already exists');
       }
       role.name = newName;
     }
     if (body.permissions !== undefined) {
       role.permissions = body.permissions;
     }
-    db.roles[index] = role;
-    // Keep users of this role in sync (both name and permissions)
-    db.users.forEach(u => {
-      if (u.role === oldName) {
-        u.role = role.name;
-        u.permissions = [...role.permissions];
-      }
-    });
-    logActivity('edited', 'role', role.id, role.name, actor);
-    saveDb();
+    await this.rolesRepo.save(role);
+
+    // Keep users of this role in sync (name + permissions)
+    const users = await this.users.find({ where: { role: oldName } });
+    if (users.length) {
+      await this.users.save(
+        users.map((u) => ({ ...u, role: role.name, permissions: [...(role.permissions || [])] })),
+      );
+    }
+    await this.logActivity('edited', 'role', role.id, role.name, actor);
     return role;
   }
 
   @Delete('roles/:id')
-  deleteRole(@Param('id') id: string, @Body() body: any) {
+  async deleteRole(@Param('id') id: string, @Body() body: any) {
+    requireSuperAdmin(body);
     const actor = actorOf(body);
-    const index = db.roles.findIndex(r => r.id === parseInt(id));
-    if (index === -1) {
-      throw new Error('Role not found');
-    }
-    const role = db.roles[index];
-    if (role.isSystem) {
-      throw new Error('System roles cannot be deleted');
-    }
-    const inUse = db.users.filter(u => u.role === role.name).length;
+    const role = await this.rolesRepo.findOne({ where: { id: parseInt(id, 10) } });
+    if (!role) throw new NotFoundException('Role not found');
+    if (role.isSystem) throw new BadRequestException('System roles cannot be deleted');
+
+    const inUse = await this.users.count({ where: { role: role.name } });
     if (inUse > 0) {
-      throw new Error(`Cannot delete a role that ${inUse} user(s) have`);
+      throw new BadRequestException(`Cannot delete a role that ${inUse} user(s) have`);
     }
-    const [deleted] = db.roles.splice(index, 1);
-    logActivity('deleted', 'role', role.id, role.name, actor);
-    saveDb();
-    return deleted;
+    await this.rolesRepo.delete(role.id);
+    await this.logActivity('deleted', 'role', role.id, role.name, actor);
+    return role;
+  }
+
+  // ---------------- Catalog: programs / requirements / scholarships ----------------
+  // These tables are normalized views of the university JSON (details.courses,
+  // details.requirements, scholarships) and are rebuilt whenever a university
+  // is created, edited, reverted or restored.
+
+  @Get('programs')
+  async getPrograms(@Query('universityId') universityId?: string) {
+    const where = universityId ? { universityId: parseInt(universityId, 10) } : {};
+    return this.programs.find({ where, order: { universityId: 'ASC', id: 'ASC' } });
+  }
+
+  @Get('requirements')
+  async getRequirements(@Query('universityId') universityId?: string) {
+    const where = universityId ? { universityId: parseInt(universityId, 10) } : {};
+    return this.requirements.find({ where, order: { universityId: 'ASC', id: 'ASC' } });
+  }
+
+  @Get('scholarships')
+  async getScholarships(@Query('universityId') universityId?: string) {
+    const where = universityId ? { universityId: parseInt(universityId, 10) } : {};
+    return this.scholarships.find({ where, order: { universityId: 'ASC', id: 'ASC' } });
   }
 
   // ---------------- Settings ----------------
+
   @Get('settings')
-  getSettings() {
-    return db.settings;
+  async getSettings() {
+    const row = await this.settings.find({ order: { id: 'ASC' } });
+    return row[0] || { ...SEED_SETTINGS };
   }
 
   @Put('settings')
-  updateSettings(@Body() body: any) {
+  async updateSettings(@Body() body: any) {
     const actor = actorOf(body);
-    const previous = { ...db.settings };
-    db.settings = {
-      appName: (body.appName || '').trim() || previous.appName,
-      appIcon: body.appIcon !== undefined ? String(body.appIcon).trim() : previous.appIcon,
+    const rows = await this.settings.find({ order: { id: 'ASC' } });
+    const previous = rows[0] || { ...SEED_SETTINGS };
+    const merged = {
+      ...previous,
+      ...(body.appName !== undefined ? { appName: String(body.appName).trim() } : {}),
+      ...(body.appIcon !== undefined ? { appIcon: String(body.appIcon).trim() } : {}),
+      ...(body.address !== undefined ? { address: String(body.address).trim() } : {}),
+      ...(body.managerName !== undefined ? { managerName: String(body.managerName).trim() } : {}),
+      ...(body.contactEmail !== undefined ? { contactEmail: String(body.contactEmail).trim() } : {}),
+      ...(body.contactPhone !== undefined ? { contactPhone: String(body.contactPhone).trim() } : {}),
     };
-    logActivity('edited', 'settings', 'settings', db.settings.appName, actor, { from: previous.appName });
-    saveDb();
-    return db.settings;
+    const saved = rows[0] ? await this.settings.save({ ...rows[0], ...merged }) : await this.settings.save(merged);
+    await this.logActivity('edited', 'settings', 'settings', saved.appName, actor, {
+      from: previous.appName,
+    });
+    return saved;
   }
 
   // ---------------- Permissions ----------------
+
   @Get('permissions')
-  getPermissions() {
+  async getPermissions() {
+    const roles = await this.rolesRepo.find({ order: { id: 'ASC' } });
+    const users = await this.users.find();
     return {
       all: ALL_PERMISSIONS,
-      roles: db.roles.map(r => ({ ...r, userCount: db.users.filter(u => u.role === r.name).length })),
+      roles: roles.map((r) => ({
+        ...r,
+        userCount: users.filter((u) => u.role === r.name).length,
+      })),
     };
   }
 
   // ---------------- Bookmarks / Save events ----------------
+
   @Post('bookmarks')
-  recordBookmark(@Body() body: any) {
-    const event: BookmarkEvent = {
-      id: ++bookmarkId,
+  async recordBookmark(@Body() body: any) {
+    return this.bookmarks.save({
       universityId: Number(body.universityId),
       universityName: body.universityName || 'Unknown',
       region: body.region || 'Unknown',
       action: body.action === 'unsave' ? 'unsave' : 'save',
       userEmail: body.userEmail,
-      timestamp: now(),
+    });
+  }
+
+  // ---------------- Reviews ----------------
+
+  @Get('reviews')
+  async getReviews(@Query('universityId') universityId?: string) {
+    const where = universityId ? { universityId: parseInt(universityId, 10) } : {};
+    const rows = await this.reviews.find({ where, order: { id: 'DESC' } });
+    const average = rows.length
+      ? rows.reduce((sum, r) => sum + r.rating, 0) / rows.length
+      : 0;
+    return {
+      reviews: rows,
+      average: Math.round(average * 10) / 10,
+      count: rows.length,
     };
-    db.bookmarks.push(event);
-    if (db.bookmarks.length > 5000) db.bookmarks.splice(0, db.bookmarks.length - 5000);
-    saveDb();
-    return event;
+  }
+
+  @Post('reviews')
+  async createReview(@Body() body: any) {
+    const rating = Math.max(1, Math.min(5, parseInt(body.rating, 10) || 5));
+    const review = await this.reviews.save({
+      universityId: Number(body.universityId),
+      universityName: body.universityName || 'University',
+      userEmail: body.userEmail || 'guest',
+      userName: body.userName || body.userEmail || 'Guest',
+      rating,
+      comment: String(body.comment || '').slice(0, 2000),
+    });
+    return review;
+  }
+
+  @Delete('reviews/:id')
+  async deleteReview(@Param('id') id: string, @Body() body: any) {
+    const review = await this.reviews.findOne({ where: { id: parseInt(id, 10) } });
+    if (!review) throw new NotFoundException('Review not found');
+    const isOwner = review.userEmail === (body && body.userEmail);
+    const isAdmin = (body && body.actorRole) === 'admin' || (body && body.actorRole) === 'super_admin';
+    if (!isOwner && !isAdmin) {
+      throw new ForbiddenException('You can only delete your own reviews');
+    }
+    await this.reviews.delete(review.id);
+    return { ok: true };
+  }
+
+  // ---------------- Application tracker ----------------
+
+  @Get('applications')
+  async getApplications(@Query('userEmail') userEmail?: string) {
+    const where = userEmail ? { userEmail } : {};
+    return this.applications.find({ where, order: { updatedAt: 'DESC' } });
+  }
+
+  @Post('applications')
+  async createApplication(@Body() body: any) {
+    if (!body.userEmail) throw new BadRequestException('userEmail is required');
+    const existing = await this.applications.findOne({
+      where: { userEmail: body.userEmail, universityId: Number(body.universityId) },
+    });
+    if (existing) {
+      existing.status = body.status || existing.status;
+      existing.notes = body.notes !== undefined ? body.notes : existing.notes;
+      return this.applications.save(existing);
+    }
+    return this.applications.save({
+      userEmail: body.userEmail,
+      universityId: Number(body.universityId),
+      universityName: body.universityName || 'University',
+      status: body.status || 'researching',
+      notes: String(body.notes || '').slice(0, 2000),
+    });
+  }
+
+  @Put('applications/:id')
+  async updateApplication(@Param('id') id: string, @Body() body: any) {
+    const app = await this.applications.findOne({ where: { id: parseInt(id, 10) } });
+    if (!app) throw new NotFoundException('Application not found');
+    const isAdmin = (body && (body.actorRole === 'admin' || body.actorRole === 'super_admin'));
+    if (!isAdmin && (!body || body.userEmail !== app.userEmail)) {
+      throw new ForbiddenException('You can only edit your own applications');
+    }
+    if (body.status !== undefined) app.status = body.status;
+    if (body.notes !== undefined) app.notes = String(body.notes).slice(0, 2000);
+    return this.applications.save(app);
+  }
+
+  @Delete('applications/:id')
+  async deleteApplication(@Param('id') id: string, @Body() body: any) {
+    const app = await this.applications.findOne({ where: { id: parseInt(id, 10) } });
+    if (!app) throw new NotFoundException('Application not found');
+    const isAdmin = (body && (body.actorRole === 'admin' || body.actorRole === 'super_admin'));
+    if (!isAdmin && (!body || body.userEmail !== app.userEmail)) {
+      throw new ForbiddenException('You can only delete your own applications');
+    }
+    await this.applications.delete(app.id);
+    return { ok: true };
   }
 
   // ---------------- Activity Log ----------------
+
   @Get('activity')
-  getActivity() {
-    return { log: db.activityLog, trash: db.trash };
+  async getActivity() {
+    const [log, trashRows] = await Promise.all([
+      this.activity.find({ order: { id: 'DESC' } }),
+      this.trash.find({ order: { id: 'DESC' } }),
+    ]);
+    return {
+      log,
+      trash: trashRows.map((r) => ({ ...r, item: stripSecrets(r.item) })),
+    };
   }
 
   // ---------------- Reports ----------------
+
   @Get('reports')
-  getReports() {
+  async getReports(@Query('period') period?: string) {
+    const [unis, regions, users, trashItems, bookmarkRows, activityRows, versionRows] =
+      await Promise.all([
+        this.universities.find(),
+        this.regions.find(),
+        this.users.find(),
+        this.trash.find(),
+        this.bookmarks.find(),
+        this.activity.find(),
+        this.versions.find(),
+      ]);
+
     const perUni = new Map<number, number>();
     const perRegion = new Map<string, number>();
-    db.bookmarks.forEach(b => {
+    bookmarkRows.forEach((b) => {
       const delta = b.action === 'save' ? 1 : -1;
       perUni.set(b.universityId, (perUni.get(b.universityId) || 0) + delta);
       perRegion.set(b.region, (perRegion.get(b.region) || 0) + delta);
     });
 
-    const uniNames = new Map(db.universities.map(u => [u.id, u.name]));
+    const uniNames = new Map(unis.map((u) => [u.id, u.name]));
     const topSavedUniversities = Array.from(perUni.entries())
       .map(([id, count]) => ({ id, name: uniNames.get(id) || 'Unknown', count: Math.max(0, count) }))
-      .filter(r => r.count > 0)
+      .filter((r) => r.count > 0)
       .sort((a, b) => b.count - a.count)
       .slice(0, 8);
 
     const savesByRegion = Array.from(perRegion.entries())
       .map(([region, count]) => ({ region, count: Math.max(0, count) }))
-      .filter(r => r.count > 0)
+      .filter((r) => r.count > 0)
       .sort((a, b) => b.count - a.count);
 
     const regionCounts = new Map<string, number>();
-    db.universities.forEach(u => {
-      regionCounts.set(u.region, (regionCounts.get(u.region) || 0) + 1);
-    });
+    unis.forEach((u) => regionCounts.set(u.region, (regionCounts.get(u.region) || 0) + 1));
     const universitiesByRegion = Array.from(regionCounts.entries())
       .map(([region, count]) => ({ region, count }))
       .sort((a, b) => b.count - a.count);
 
     const actionCounts = new Map<string, number>();
-    db.activityLog.forEach(a => {
-      actionCounts.set(a.action, (actionCounts.get(a.action) || 0) + 1);
-    });
+    activityRows.forEach((a) => actionCounts.set(a.action, (actionCounts.get(a.action) || 0) + 1));
     const activityBreakdown = Array.from(actionCounts.entries())
       .map(([action, count]) => ({ action, count }))
       .sort((a, b) => b.count - a.count);
 
-    const programCount = db.universities.reduce((sum, u) => sum + (u.details?.courses?.length || 0), 0);
+    const programCount = unis.reduce((sum, u) => sum + (u.details?.courses?.length || 0), 0);
+
+    // Time-series buckets when a period is requested
+    const validPeriods: Period[] = ['daily', 'weekly', 'monthly', 'yearly'];
+    const p = validPeriods.includes(period as Period) ? (period as Period) : null;
+    let bookmarksByPeriod: { label: string; saves: number; unsaves: number }[] = [];
+    let activityByPeriod: { label: string; count: number }[] = [];
+
+    if (p) {
+      const buckets = buildBuckets(p);
+      const index = new Map(buckets.map((b, i) => [b.key, i]));
+      bookmarksByPeriod = buckets.map((b) => ({ label: b.label, saves: 0, unsaves: 0 }));
+      activityByPeriod = buckets.map((b) => ({ label: b.label, count: 0 }));
+
+      bookmarkRows.forEach((b) => {
+        const idx = index.get(bucketKey(p, new Date(b.timestamp)));
+        if (idx !== undefined) {
+          if (b.action === 'save') bookmarksByPeriod[idx].saves++;
+          else bookmarksByPeriod[idx].unsaves++;
+        }
+      });
+      activityRows.forEach((a) => {
+        const idx = index.get(bucketKey(p, new Date(a.timestamp)));
+        if (idx !== undefined) activityByPeriod[idx].count++;
+      });
+    }
 
     return {
       totals: {
-        universities: db.universities.length,
-        regions: db.regions.length,
-        users: db.users.length,
-        admins: db.users.filter(u => u.role === 'admin').length,
+        universities: unis.length,
+        regions: regions.length,
+        users: users.length,
+        admins: users.filter((u) => u.role === 'admin' || u.role === 'super_admin').length,
         programs: programCount,
-        trash: db.trash.length,
-        bookmarks: db.bookmarks.filter(b => b.action === 'save').length,
-        versions: Object.values(db.versions).reduce((s, v) => s + v.length, 0),
+        trash: trashItems.length,
+        bookmarks: bookmarkRows.filter((b) => b.action === 'save').length,
+        versions: versionRows.length,
       },
       topSavedUniversities,
       savesByRegion,
       universitiesByRegion,
       activityBreakdown,
+      period: p || 'all',
+      bookmarksByPeriod,
+      activityByPeriod,
     };
   }
 
-  // ---------------- Export / Import ----------------
+  // ---------------- Export / Import / Reset ----------------
+
   @Get('export')
-  exportDb() {
+  async exportDb() {
+    const [unis, regions, users, roles, settingsRows, activityRows, versionRows, trashRows, bookmarkRows, reviewRows, appRows, prefRows, scoreRows, recRows, programRows, reqRows, schRows] =
+      await Promise.all([
+        this.universities.find(),
+        this.regions.find(),
+        this.users.find(),
+        this.rolesRepo.find(),
+        this.settings.find(),
+        this.activity.find(),
+        this.versions.find(),
+        this.trash.find(),
+        this.bookmarks.find(),
+        this.reviews.find(),
+        this.applications.find(),
+        this.preferences.find(),
+        this.scores.find(),
+        this.recommendations.find(),
+        this.programs.find(),
+        this.requirements.find(),
+        this.scholarships.find(),
+      ]);
+
+    const versions: Record<string, any[]> = {};
+    versionRows.forEach((v) => {
+      const key = String(v.universityId);
+      if (!versions[key]) versions[key] = [];
+      versions[key].push({ ...v });
+    });
+
     return {
-      exportedAt: now(),
-      app: db.settings.appName,
-      data: db,
+      exportedAt: new Date().toISOString(),
+      app: (settingsRows[0] || SEED_SETTINGS).appName,
+      data: {
+        universities: unis,
+        regions: regions.map((r) => r.name),
+        users,
+        roles,
+        settings: settingsRows[0] || SEED_SETTINGS,
+        activityLog: activityRows,
+        versions,
+        trash: trashRows.map((r) => ({ ...r, item: stripSecrets(r.item) })),
+        bookmarks: bookmarkRows,
+        reviews: reviewRows,
+        applications: appRows,
+        userPreferences: prefRows,
+        academicScores: scoreRows,
+        recommendations: recRows,
+        programs: programRows,
+        requirements: reqRows,
+        scholarships: schRows,
+      },
     };
   }
 
   @Post('import')
-  importDb(@Body() body: any) {
+  async importDb(@Body() body: any) {
     const actor = actorOf(body);
     const incoming = body.data || body;
     if (!incoming || typeof incoming !== 'object') {
-      throw new Error('Invalid import data');
+      throw new BadRequestException('Invalid import data');
     }
-    const incomingRoles: Role[] = (Array.isArray(incoming.roles) && incoming.roles.length ? incoming.roles : clone(seedDb.roles)).map((r: any) => ({
-      id: r.id ?? Date.now(),
-      name: r.name || 'role',
-      permissions: Array.isArray(r.permissions) ? r.permissions : [],
-      isSystem: !!r.isSystem,
-    }));
-    db = {
-      universities: (Array.isArray(incoming.universities) ? incoming.universities : []).map(enrichUniversity),
-      regions: Array.isArray(incoming.regions) ? incoming.regions : [],
-      users: (Array.isArray(incoming.users) ? incoming.users : []).map(u => normalizeUser(u, incomingRoles)),
-      roles: incomingRoles,
-      settings: { ...seedDb.settings, ...(incoming.settings || {}) },
-      activityLog: Array.isArray(incoming.activityLog) ? incoming.activityLog : [],
-      versions: incoming.versions && typeof incoming.versions === 'object' ? incoming.versions : {},
-      trash: Array.isArray(incoming.trash) ? incoming.trash : [],
-      bookmarks: Array.isArray(incoming.bookmarks) ? incoming.bookmarks : [],
-    };
-    logActivity('imported', 'settings', 'db', 'Database import', actor, {
-      universities: db.universities.length,
-      regions: db.regions.length,
-      users: db.users.length,
+
+    await applyDbShape(this.dataSource, incoming);
+    await this.logActivity('imported', 'settings', 'db', 'Database import', actor, {
+      universities: incoming.universities?.length || 0,
+      regions: incoming.regions?.length || 0,
+      users: incoming.users?.length || 0,
     });
-    saveDb();
-    return {
-      ok: true,
-      totals: {
-        universities: db.universities.length,
-        regions: db.regions.length,
-        users: db.users.length,
-      },
-    };
+
+    const [unis, regions, users] = await Promise.all([
+      this.universities.count(),
+      this.regions.count(),
+      this.users.count(),
+    ]);
+    return { ok: true, totals: { universities: unis, regions, users } };
+  }
+
+  /** Wipes all data and re-seeds defaults. Super Admin only. */
+  @Post('reset')
+  async resetDatabase(@Body() body: any) {
+    requireSuperAdmin(body);
+    const actor = actorOf(body);
+
+    await applyDbShape(this.dataSource, {} as any, true);
+    await this.logActivity('restored', 'settings', 'db', 'Database reset', actor);
+
+    const [unis, regions, users] = await Promise.all([
+      this.universities.count(),
+      this.regions.count(),
+      this.users.count(),
+    ]);
+    return { ok: true, totals: { universities: unis, regions, users } };
+  }
+
+  // ---------------- Private helpers ----------------
+
+  /**
+   * Rebuilds the normalized programs / requirements / scholarships rows for a
+   * single university from its JSON columns.
+   */
+  private async syncUniversityRelations(uni: any) {
+    if (!uni || !uni.id) return;
+    const { programs, requirements, scholarships } = deriveUniversityRelations(uni);
+    await this.programs.delete({ universityId: uni.id });
+    await this.requirements.delete({ universityId: uni.id });
+    await this.scholarships.delete({ universityId: uni.id });
+    if (programs.length) await this.programs.save(programs as any);
+    if (requirements.length) await this.requirements.save(requirements as any);
+    if (scholarships.length) await this.scholarships.save(scholarships as any);
+  }
+
+  private async pushVersion(uni: any, actor: string, summary: string) {
+    const rows = await this.versions.find({ where: { universityId: uni.id } });
+    const nextVersion = rows.length ? Math.max(...rows.map((r) => r.version)) + 1 : 1;
+    await this.versions.save({
+      universityId: uni.id,
+      version: nextVersion,
+      snapshot: { ...uni },
+      actor,
+      summary,
+    });
+  }
+
+  private async logActivity(
+    action: string,
+    entity: string,
+    entityId: string | number,
+    entityName: string,
+    actor: string,
+    meta?: any,
+  ) {
+    await this.activity.save({
+      action,
+      entity,
+      entityId: String(entityId),
+      entityName,
+      actor,
+      meta,
+    });
+    // Keep the log bounded (latest 300)
+    const count = await this.activity.count();
+    if (count > 300) {
+      const extra = await this.activity.find({ order: { id: 'ASC' }, take: count - 300 });
+      if (extra.length) await this.activity.remove(extra);
+    }
   }
 }

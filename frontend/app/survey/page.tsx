@@ -35,21 +35,83 @@ export default function Survey() {
     startDate: '',
   });
 
+  // Load previously saved preferences from the database (survives logout/login
+  // and other browsers) and redirect to login when not signed in.
   useEffect(() => {
     const user = localStorage.getItem('user');
     if (!user) {
       router.push('/login');
+      return;
+    }
+    try {
+      const parsed = JSON.parse(user);
+      if (parsed.email) {
+        fetch(`/api/preferences?email=${encodeURIComponent(parsed.email)}`)
+          .then((r) => (r.ok ? r.json() : null))
+          .then((d) => {
+            if (d?.preferences) {
+              setPreferences((prev) => ({
+                ...prev,
+                ...d.preferences,
+                // Settings stores majors as an array; the survey uses a single string
+                intendedMajor: Array.isArray(d.preferences.intendedMajor)
+                  ? d.preferences.intendedMajor[0] || ''
+                  : d.preferences.intendedMajor || '',
+                preferredRegions: Array.isArray(d.preferences.preferredRegions)
+                  ? d.preferences.preferredRegions
+                  : [],
+                preferredCountries: Array.isArray(d.preferences.preferredCountries)
+                  ? d.preferences.preferredCountries
+                  : [],
+                languageRequirements: Array.isArray(d.preferences.languageRequirements)
+                  ? d.preferences.languageRequirements
+                  : [],
+              }));
+            }
+          })
+          .catch(() => {});
+      }
+    } catch {
+      /* ignore malformed user */
     }
   }, [router]);
 
-  const handleSkip = () => {
+  /** Persist preferences + derived academic scores to the database. */
+  const persistPreferences = async (completed: boolean) => {
+    const user = localStorage.getItem('user');
+    if (!user) return;
+    try {
+      const email = JSON.parse(user).email;
+      if (!email) return;
+      await fetch('/api/preferences', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, ...preferences, surveyCompleted: completed }),
+      });
+      // Always sync scores (even an empty list clears old rows, e.g. when the
+      // user removed their GPA)
+      const scores: { name: string; score: string; scale: string; status: string }[] = [];
+      if (preferences.gpa) scores.push({ name: 'GPA', score: preferences.gpa, scale: '4.0', status: 'achieved' });
+      await fetch('/api/preferences/scores', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, scores }),
+      });
+    } catch {
+      /* offline / backend down — localStorage still has the data */
+    }
+  };
+
+  const handleSkip = async () => {
     saveUserData('surveyCompleted', 'true');
+    await persistPreferences(true);
     router.push('/explore');
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     saveUserData('userPreferences', preferences);
     saveUserData('surveyCompleted', 'true');
+    await persistPreferences(true);
     router.push('/explore');
   };
 
@@ -254,7 +316,7 @@ export default function Survey() {
         )}
 
         {/* Navigation Buttons */}
-        <div className="flex justify-between mt-8">
+        <div className="flex flex-wrap items-center justify-between gap-3 mt-8">
           <button
             onClick={prevStep}
             disabled={step === 1}

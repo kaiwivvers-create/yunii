@@ -18,9 +18,55 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
-/* Reserve space for the scrollbar so content doesn't jump left/right when it appears */
-html {
-  scrollbar-gutter: stable;
+/* ------------------------------------------------------------------
+   Custom scrollbars (styled to match the app palette)
+------------------------------------------------------------------- */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #B9ACDE transparent;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #B9ACDE;
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #9370DB;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Dark mode */
+.dark * {
+  scrollbar-color: #4B3F6E transparent;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #4B3F6E;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #6B5BA8;
+  border: 2px solid transparent;
+  background-clip: content-box;
 }
 
 @keyframes fadeInDown {

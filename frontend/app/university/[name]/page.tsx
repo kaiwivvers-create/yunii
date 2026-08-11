@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import Navbar from '../../../components/Navbar';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useBrand } from '@/contexts/BrandContext';
+import { localizeUniversity } from '@/data/universityTranslations';
 import { loadUserData, saveUserData } from '@/utils/userStorage';
 import {
   ChevronDown,
@@ -19,6 +21,14 @@ import {
   Scale,
   Check,
   BookOpen,
+  Star,
+  MessageSquare,
+  Trash2,
+  Send,
+  User,
+  Loader2,
+  Share2,
+  CheckCircle2,
 } from 'lucide-react';
 
 const universityData: Record<string, any> = {
@@ -363,17 +373,30 @@ const sections: { id: string; labelKey: string; icon: any }[] = [
   { id: 'costvisa', labelKey: 'costOfLiving', icon: Plane },
   { id: 'undergraduate', labelKey: 'undergraduate', icon: GraduationCap },
   { id: 'graduate', labelKey: 'graduate', icon: GraduationCap },
+  { id: 'reviews', labelKey: 'reviews', icon: MessageSquare },
 ];
 
 export default function UniversityPage() {
   const params = useParams();
   const universityName = params.name as string;
   const { t, lang } = useLanguage();
+  const { appName } = useBrand();
   const [university, setUniversity] = useState<any>(null);
   const [activeSection, setActiveSection] = useState('overview');
   const [expandedCourse, setExpandedCourse] = useState<string | null>(null);
   const [inCompare, setInCompare] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  // Reviews
+  const [reviews, setReviews] = useState<any[]>([]);
+  const [reviewStats, setReviewStats] = useState({ average: 0, count: 0 });
+  const [myRating, setMyRating] = useState(0);
+  const [myComment, setMyComment] = useState('');
+  const [submittingReview, setSubmittingReview] = useState(false);
+  const [reviewMsg, setReviewMsg] = useState('');
+  const [reviewError, setReviewError] = useState('');
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -382,10 +405,14 @@ export default function UniversityPage() {
       .then((list: any[]) => {
         const live = list.find((u) => slugify(u.name) === universityName);
         const raw = live || universityData[universityName];
-        setUniversity(raw ? normalizeUni(raw) : null);
+        setUniversity(raw ? localizeUniversity(normalizeUni(raw), lang) : null);
       })
       .catch(() => {
-        setUniversity(universityData[universityName] ? normalizeUni(universityData[universityName]) : null);
+        setUniversity(
+          universityData[universityName]
+            ? localizeUniversity(normalizeUni(universityData[universityName]), lang)
+            : null,
+        );
       })
       .finally(() => setLoading(false));
   }, [universityName]);
@@ -395,6 +422,31 @@ export default function UniversityPage() {
       const list = loadUserData<number[]>('compareList', []);
       setInCompare(list.includes(university.id));
     }
+  }, [university]);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('user');
+      if (raw) setCurrentUser(JSON.parse(raw));
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  // Re-apply description/overview translations when the app language changes
+  useEffect(() => {
+    setUniversity((u: any) => (u ? localizeUniversity(u, lang) : u));
+  }, [lang]);
+
+  useEffect(() => {
+    if (!university || !university.id) return;
+    fetch(`/api/admin/reviews?universityId=${university.id}`)
+      .then((r) => (r.ok ? r.json() : { reviews: [], average: 0, count: 0 }))
+      .then((data) => {
+        setReviews(data.reviews || []);
+        setReviewStats({ average: data.average || 0, count: data.count || 0 });
+      })
+      .catch(() => {});
   }, [university]);
 
   const toggleCompare = () => {
@@ -419,6 +471,73 @@ export default function UniversityPage() {
 
   const toggleCourse = (course: string) => {
     setExpandedCourse(expandedCourse === course ? null : course);
+  };
+
+  const refreshReviews = async () => {
+    if (!university) return;
+    const data = await fetch(`/api/admin/reviews?universityId=${university.id}`)
+      .then((r) => (r.ok ? r.json() : { reviews: [], average: 0, count: 0 }))
+      .catch(() => ({ reviews: [], average: 0, count: 0 }));
+    setReviews(data.reviews || []);
+    setReviewStats({ average: data.average || 0, count: data.count || 0 });
+  };
+
+  const submitReview = async () => {
+    if (!currentUser || !university) return;
+    if (myRating < 1) {
+      setReviewError(t('yourRating'));
+      return;
+    }
+    setSubmittingReview(true);
+    setReviewError('');
+    setReviewMsg('');
+    try {
+      const res = await fetch('/api/admin/reviews', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          universityId: university.id,
+          universityName: university.name,
+          userEmail: currentUser.email,
+          userName: currentUser.name || currentUser.email,
+          rating: myRating,
+          comment: myComment.trim(),
+        }),
+      });
+      if (!res.ok) throw new Error('failed');
+      setReviewMsg(t('reviewSubmitted'));
+      setMyRating(0);
+      setMyComment('');
+      await refreshReviews();
+    } catch {
+      setReviewError(t('reviewFailed'));
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
+
+  const removeReview = async (id: number) => {
+    if (!currentUser) return;
+    try {
+      await fetch(`/api/admin/reviews/${id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userEmail: currentUser.email, actorRole: currentUser.role }),
+      });
+      await refreshReviews();
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const shareUniversity = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* ignore */
+    }
   };
 
   if (loading) {
@@ -451,8 +570,8 @@ export default function UniversityPage() {
 
       <section className="pt-16">
         <div className="flex gap-0 h-[calc(100vh-4rem)]">
-          {/* Left side - Sidebar Navigation */}
-          <div className="w-64 bg-[#C8C8E0] p-4 h-full overflow-y-auto shrink-0">
+          {/* Left side - Sidebar Navigation (desktop/tablet) */}
+          <div className="hidden md:block w-64 bg-[#C8C8E0] p-4 h-full overflow-y-auto shrink-0">
             <div className="space-y-2">
               {sections.map(({ id, labelKey, icon: Icon }) => (
                 <button
@@ -472,16 +591,34 @@ export default function UniversityPage() {
           </div>
 
           {/* Right side - Content */}
-          <div className="flex-1 overflow-y-auto p-8">
+          <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+            {/* Mobile section tabs */}
+            <div className="md:hidden sticky top-0 -mx-4 sm:-mx-6 px-4 sm:px-6 py-2.5 bg-[#E8E8F0] z-20 -mt-4 sm:-mt-6 border-b border-[#A8A8C8] overflow-x-auto">
+              <div className="flex gap-1.5">
+                {sections.map(({ id, labelKey }) => (
+                  <button
+                    key={id}
+                    onClick={() => scrollToSection(id)}
+                    className={`whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                      activeSection === id
+                        ? 'bg-[#9370DB] text-white shadow-sm shadow-[#9370DB]/30'
+                        : 'bg-[#C8C8E0] text-slate-800 hover:bg-[#D8D8E8]'
+                    }`}
+                  >
+                    {t(labelKey)}
+                  </button>
+                ))}
+              </div>
+            </div>
             <div id="overview" className="mb-12 scroll-mt-4">
               <img
                 src={university.image}
                 alt={university.name}
-                className="w-full h-96 object-cover rounded-lg mb-6"
+                className="w-full h-56 sm:h-72 lg:h-96 object-cover rounded-lg mb-6"
               />
-              <div className="bg-[#C8C8E0] border border-[#A8A8C8] rounded-lg p-8">
+              <div className="bg-[#C8C8E0] border border-[#A8A8C8] rounded-lg p-5 sm:p-8">
                 <div className="flex flex-wrap items-start justify-between gap-4 mb-3">
-                  <h1 className="text-5xl font-bold text-slate-900 font-serif">{university.name}</h1>
+                  <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-slate-900 font-serif">{university.name}</h1>
                   {university.rankings?.overall && (
                     <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#9370DB] text-white rounded-full text-sm font-semibold">
                       <Trophy className="w-4 h-4" />
@@ -489,8 +626,8 @@ export default function UniversityPage() {
                     </span>
                   )}
                 </div>
-                <p className="text-2xl text-slate-800 mb-4 font-light">{university.location}</p>
-                <p className="text-xl text-slate-800 font-light">{university.description}</p>
+                <p className="text-lg sm:text-2xl text-slate-800 mb-4 font-light">{university.location}</p>
+                <p className="text-base sm:text-xl text-slate-800 font-light">{university.description}</p>
                 {university.overview && (
                   <p className="text-slate-800 mt-4">{university.overview}</p>
                 )}
@@ -514,6 +651,17 @@ export default function UniversityPage() {
                       {t('seeInCompare')}
                     </Link>
                   )}
+                  <button
+                    onClick={shareUniversity}
+                    className={`inline-flex items-center gap-2 px-6 py-3 rounded font-medium transition-colors ${
+                      copied
+                        ? 'bg-emerald-500 text-white hover:bg-emerald-600'
+                        : 'bg-white text-[#9370DB] border border-[#9370DB] hover:bg-[#9370DB]/10'
+                    }`}
+                  >
+                    {copied ? <CheckCircle2 className="w-4 h-4" /> : <Share2 className="w-4 h-4" />}
+                    {copied ? t('linkCopied') : t('share')}
+                  </button>
                   <button className="inline-flex items-center gap-2 px-6 py-3 bg-[#9370DB] text-white rounded font-medium hover:bg-[#7B68EE] transition-colors">
                     {t('applyNow')}
                   </button>
@@ -522,7 +670,7 @@ export default function UniversityPage() {
             </div>
 
             <div id="details" className="mb-12 scroll-mt-4">
-              <div className="bg-[#C8C8E0] border border-[#A8A8C8] rounded-lg p-8">
+              <div className="bg-[#C8C8E0] border border-[#A8A8C8] rounded-lg p-5 sm:p-8">
                 <h2 className="text-2xl font-bold text-slate-900 mb-4">{t('details')}</h2>
                 <ul className="space-y-3">
                   {university.details.map((detail: string, index: number) => (
@@ -537,7 +685,7 @@ export default function UniversityPage() {
             </div>
 
             <div id="rankings" className="mb-12 scroll-mt-4">
-              <div className="bg-[#C8C8E0] border border-[#A8A8C8] rounded-lg p-8">
+              <div className="bg-[#C8C8E0] border border-[#A8A8C8] rounded-lg p-5 sm:p-8">
                 <h2 className="text-2xl font-bold text-slate-900 mb-4 flex items-center gap-2">
                   <Trophy className="w-6 h-6 text-[#9370DB]" />
                   {t('rankings')}
@@ -546,7 +694,7 @@ export default function UniversityPage() {
                   <div className="inline-flex flex-col items-center px-8 py-6 bg-[#E8E8F0] border border-[#A8A8C8] rounded-xl">
                     <span className="text-xs uppercase tracking-wider text-slate-500 mb-1">{t('worldRank')}</span>
                     <span className="text-4xl font-bold text-[#9370DB]">#{university.rankings?.overall || '—'}</span>
-                    <span className="text-xs text-slate-500 mt-1">UniVerse 2027</span>
+                    <span className="text-xs text-slate-500 mt-1">{appName} 2027</span>
                   </div>
                 </div>
                 <h3 className="font-semibold text-slate-900 mb-3">{t('programRankings')}</h3>
@@ -567,7 +715,7 @@ export default function UniversityPage() {
             </div>
 
             <div id="proscons" className="mb-12 scroll-mt-4">
-              <div className="bg-[#C8C8E0] border border-[#A8A8C8] rounded-lg p-8">
+              <div className="bg-[#C8C8E0] border border-[#A8A8C8] rounded-lg p-5 sm:p-8">
                 <h2 className="text-2xl font-bold text-slate-900 mb-5 flex items-center gap-2">
                   <ThumbsUp className="w-6 h-6 text-emerald-500" />
                   {t('prosCons')}
@@ -604,7 +752,7 @@ export default function UniversityPage() {
             </div>
 
             <div id="scholarships" className="mb-12 scroll-mt-4">
-              <div className="bg-[#C8C8E0] border border-[#A8A8C8] rounded-lg p-8">
+              <div className="bg-[#C8C8E0] border border-[#A8A8C8] rounded-lg p-5 sm:p-8">
                 <h2 className="text-2xl font-bold text-slate-900 mb-5 flex items-center gap-2">
                   <Wallet className="w-6 h-6 text-amber-500" />
                   {t('scholarships')}
@@ -625,7 +773,7 @@ export default function UniversityPage() {
             </div>
 
             <div id="deadlines" className="mb-12 scroll-mt-4">
-              <div className="bg-[#C8C8E0] border border-[#A8A8C8] rounded-lg p-8">
+              <div className="bg-[#C8C8E0] border border-[#A8A8C8] rounded-lg p-5 sm:p-8">
                 <h2 className="text-2xl font-bold text-slate-900 mb-5 flex items-center gap-2">
                   <Calendar className="w-6 h-6 text-[#9370DB]" />
                   {t('deadlines')}
@@ -643,7 +791,7 @@ export default function UniversityPage() {
             </div>
 
             <div id="courses" className="mb-12 scroll-mt-4">
-              <div className="bg-[#C8C8E0] border border-[#A8A8C8] rounded-lg p-8">
+              <div className="bg-[#C8C8E0] border border-[#A8A8C8] rounded-lg p-5 sm:p-8">
                 <h2 className="text-2xl font-bold text-slate-900 mb-4">{t('courses')}</h2>
                 <div className="space-y-2">
                   {university.courses.map((course: any, index: number) => (
@@ -676,7 +824,7 @@ export default function UniversityPage() {
             </div>
 
             <div id="requirements" className="mb-12 scroll-mt-4">
-              <div className="bg-[#C8C8E0] border border-[#A8A8C8] rounded-lg p-8">
+              <div className="bg-[#C8C8E0] border border-[#A8A8C8] rounded-lg p-5 sm:p-8">
                 <h2 className="text-2xl font-bold text-slate-900 mb-4">{t('requirements')}</h2>
                 <ul className="space-y-3">
                   {university.requirements.map((req: string, index: number) => (
@@ -691,7 +839,7 @@ export default function UniversityPage() {
             </div>
 
             <div id="prices" className="mb-12 scroll-mt-4">
-              <div className="bg-[#C8C8E0] border border-[#A8A8C8] rounded-lg p-8">
+              <div className="bg-[#C8C8E0] border border-[#A8A8C8] rounded-lg p-5 sm:p-8">
                 <h2 className="text-2xl font-bold text-slate-900 mb-4">{t('prices')}</h2>
                 <div className="space-y-4">
                   <div className="bg-[#E8E8F0] border border-[#A8A8C8] rounded-lg p-4">
@@ -707,7 +855,7 @@ export default function UniversityPage() {
             </div>
 
             <div id="costvisa" className="mb-12 scroll-mt-4">
-              <div className="bg-[#C8C8E0] border border-[#A8A8C8] rounded-lg p-8">
+              <div className="bg-[#C8C8E0] border border-[#A8A8C8] rounded-lg p-5 sm:p-8">
                 <h2 className="text-2xl font-bold text-slate-900 mb-5 flex items-center gap-2">
                   <Plane className="w-6 h-6 text-sky-500" />
                   {t('costOfLiving')} & {t('visa')}
@@ -745,7 +893,7 @@ export default function UniversityPage() {
             </div>
 
             <div id="undergraduate" className="mb-12 scroll-mt-4">
-              <div className="bg-[#C8C8E0] border border-[#A8A8C8] rounded-lg p-8">
+              <div className="bg-[#C8C8E0] border border-[#A8A8C8] rounded-lg p-5 sm:p-8">
                 <h2 className="text-2xl font-bold text-slate-900 mb-4">{t('undergraduatePrograms')}</h2>
                 <ul className="space-y-3">
                   {university.undergraduate.map((prog: string, index: number) => (
@@ -759,7 +907,7 @@ export default function UniversityPage() {
             </div>
 
             <div id="graduate" className="mb-12 scroll-mt-4">
-              <div className="bg-[#C8C8E0] border border-[#A8A8C8] rounded-lg p-8">
+              <div className="bg-[#C8C8E0] border border-[#A8A8C8] rounded-lg p-5 sm:p-8">
                 <h2 className="text-2xl font-bold text-slate-900 mb-4">{t('graduatePrograms')}</h2>
                 <ul className="space-y-3">
                   {university.graduate.map((prog: string, index: number) => (
@@ -769,6 +917,164 @@ export default function UniversityPage() {
                     </li>
                   ))}
                 </ul>
+              </div>
+            </div>
+
+            <div id="reviews" className="mb-12 scroll-mt-4">
+              <div className="bg-[#C8C8E0] border border-[#A8A8C8] rounded-lg p-5 sm:p-8">
+                <h2 className="text-2xl font-bold text-slate-900 mb-5 flex items-center gap-2">
+                  <MessageSquare className="w-6 h-6 text-[#9370DB]" />
+                  {t('reviews')}
+                </h2>
+
+                <div className="flex flex-wrap items-start gap-6 mb-8">
+                  <div className="inline-flex flex-col items-center px-8 py-5 bg-[#E8E8F0] border border-[#A8A8C8] rounded-xl">
+                    <span className="text-4xl font-bold text-[#9370DB]">
+                      {reviewStats.count ? reviewStats.average : '—'}
+                    </span>
+                    <div className="flex gap-0.5 mt-1">
+                      {[1, 2, 3, 4, 5].map((n) => (
+                        <Star
+                          key={n}
+                          className={`w-4 h-4 ${
+                            n <= Math.round(reviewStats.average)
+                              ? 'fill-amber-400 text-amber-400'
+                              : 'text-slate-300'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                    <span className="text-xs text-slate-500 mt-1">
+                      {reviewStats.count} {t('reviews')}
+                    </span>
+                  </div>
+
+                  {currentUser ? (
+                    <div className="flex-1 min-w-[260px]">
+                      <h3 className="font-semibold text-slate-900 mb-2">{t('writeAReview')}</h3>
+                      <div className="flex items-center gap-1 mb-2">
+                        {[1, 2, 3, 4, 5].map((n) => (
+                          <button
+                            key={n}
+                            type="button"
+                            onClick={() => setMyRating(n)}
+                            className="p-0.5 transition-transform hover:scale-110"
+                            title={`${n} ${t('ratingOutOf5')}`}
+                          >
+                            <Star
+                              className={`w-6 h-6 ${
+                                n <= myRating
+                                  ? 'fill-amber-400 text-amber-400'
+                                  : 'text-slate-300 hover:text-amber-300'
+                              }`}
+                            />
+                          </button>
+                        ))}
+                        {myRating > 0 && (
+                          <span className="ml-2 text-sm text-slate-600">{myRating}/5</span>
+                        )}
+                      </div>
+                      <textarea
+                        value={myComment}
+                        onChange={(e) => setMyComment(e.target.value)}
+                        maxLength={500}
+                        rows={3}
+                        placeholder={t('reviewPlaceholder')}
+                        className="w-full px-4 py-3 border border-[#A8A8C8] rounded-lg bg-[#E8E8F0] text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#9370DB] focus:ring-1 focus:ring-[#9370DB]"
+                      />
+                      {reviewMsg && (
+                        <p className="text-sm text-emerald-600 mt-2">{reviewMsg}</p>
+                      )}
+                      {reviewError && (
+                        <p className="text-sm text-red-500 mt-2">{reviewError}</p>
+                      )}
+                      <button
+                        onClick={submitReview}
+                        disabled={submittingReview}
+                        className="mt-3 inline-flex items-center gap-2 px-5 py-2.5 bg-[#9370DB] text-white rounded-lg font-medium hover:bg-[#7B68EE] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {submittingReview ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Send className="w-4 h-4" />
+                        )}
+                        {submittingReview ? t('submitting') : t('submitReview')}
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex-1">
+                      <p className="text-slate-600 mb-3">{t('signInToReview')}</p>
+                      <Link
+                        href="/login"
+                        className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#9370DB] text-white rounded-lg font-medium hover:bg-[#7B68EE] transition-colors"
+                      >
+                        <User className="w-4 h-4" />
+                        {t('signIn')}
+                      </Link>
+                    </div>
+                  )}
+                </div>
+
+                {reviews.length === 0 ? (
+                  <p className="text-slate-500">{t('noReviewsYet')}</p>
+                ) : (
+                  <div className="space-y-4">
+                    {reviews.map((r) => (
+                      <div
+                        key={r.id}
+                        className="bg-[#E8E8F0] border border-[#A8A8C8] rounded-lg p-4"
+                      >
+                        <div className="flex items-center justify-between gap-3 mb-2">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="w-9 h-9 rounded-full bg-[#9370DB]/20 text-[#9370DB] flex items-center justify-center font-bold text-sm shrink-0">
+                              {(r.userName || r.userEmail || 'G')[0].toUpperCase()}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-sm font-semibold text-slate-900 flex items-center gap-1.5 truncate">
+                                {r.userName || r.userEmail}
+                                {currentUser && r.userEmail === currentUser.email && (
+                                  <span className="text-[11px] px-1.5 py-0.5 bg-[#9370DB]/10 text-[#9370DB] rounded-full shrink-0">
+                                    you
+                                  </span>
+                                )}
+                              </p>
+                              <p className="text-[11px] text-slate-500">
+                                {new Date(r.createdAt).toLocaleDateString()}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <div className="flex gap-0.5">
+                              {[1, 2, 3, 4, 5].map((n) => (
+                                <Star
+                                  key={n}
+                                  className={`w-4 h-4 ${
+                                    n <= r.rating
+                                      ? 'fill-amber-400 text-amber-400'
+                                      : 'text-slate-300'
+                                  }`}
+                                />
+                              ))}
+                            </div>
+                            {currentUser &&
+                              (currentUser.email === r.userEmail ||
+                                currentUser.role === 'admin' ||
+                                currentUser.role === 'super_admin') && (
+                                <button
+                                  onClick={() => removeReview(r.id)}
+                                  className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-500/10 rounded transition-colors"
+                                  title={t('deleteReview')}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              )}
+                          </div>
+                        </div>
+                        <p className="text-slate-700 text-sm leading-relaxed">{r.comment}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </div>

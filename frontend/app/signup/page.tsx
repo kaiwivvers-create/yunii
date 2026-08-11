@@ -1,11 +1,43 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Navbar from '@/components/Navbar';
+import MathCaptcha from '@/components/MathCaptcha';
+import LegalModal from '@/components/LegalModal';
 import { getPreservedProfileFor } from '@/utils/preservedProfile';
 import { useLanguage } from '@/contexts/LanguageContext';
+
+const RECAPTCHA_SITE_KEY = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY;
+
+/** Google reCAPTCHA checkbox (only rendered when NEXT_PUBLIC_RECAPTCHA_SITE_KEY is set). */
+function RecaptchaField({ onVerified }: { onVerified: (ok: boolean) => void }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY;
+    if (!siteKey) return;
+    const script = document.createElement('script');
+    script.src = 'https://www.google.com/recaptcha/api.js';
+    script.async = true;
+    script.defer = true;
+    script.onload = () => {
+      const w = window as any;
+      if (w.grecaptcha && ref.current) {
+        w.grecaptcha.render(ref.current, {
+          sitekey: siteKey,
+          callback: () => onVerified(true),
+          'expired-callback': () => onVerified(false),
+        });
+      }
+    };
+    document.body.appendChild(script);
+    return () => {
+      document.body.removeChild(script);
+    };
+  }, [onVerified]);
+  return <div ref={ref} />;
+}
 
 export default function Signup() {
   const { t } = useLanguage();
@@ -14,16 +46,25 @@ export default function Signup() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [captchaOk, setCaptchaOk] = useState(false);
+  const [legalModal, setLegalModal] = useState<'terms' | 'privacy' | null>(null);
   const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+    setError('');
+
     if (password !== confirmPassword) {
-      alert(t('passwordsDoNotMatch'));
+      setError(t('passwordsDoNotMatch'));
       return;
     }
-    
+
+    if (!captchaOk) {
+      setError(t('captchaRequired'));
+      return;
+    }
+
     setIsLoading(true);
     
     try {
@@ -55,11 +96,12 @@ export default function Signup() {
         
         router.push('/survey');
       } else {
-        alert(t('signupFailed'));
+        const errData = await response.json().catch(() => ({}));
+        setError(errData.message || t('signupFailed'));
       }
     } catch (error) {
       console.error('Signup error:', error);
-      alert(t('signupFailed'));
+      setError(t('signupFailed'));
     } finally {
       setIsLoading(false);
     }
@@ -88,8 +130,8 @@ export default function Signup() {
         </div>
 
         {/* Right side - White Form */}
-        <div className="w-full lg:w-1/2 bg-white flex items-center justify-center p-8 lg:p-16">
-          <div className="w-full max-w-md animate-rise-in">
+        <div className="w-full lg:w-1/2 bg-white flex overflow-y-auto">
+          <div className="m-auto w-full max-w-md px-6 py-10 sm:p-8 lg:p-16 animate-rise-in">
             <div className="mb-8">
               <p className="text-base text-slate-600">
                 {t('alreadyHaveAccount')}{' '}
@@ -177,15 +219,35 @@ export default function Signup() {
                 />
                 <span className="ml-2 text-sm text-slate-600">
                   {t('iAgreeTo')}{' '}
-                  <Link href="/terms" className="text-[#9370DB] hover:underline">
+                  <button
+                    type="button"
+                    onClick={() => setLegalModal('terms')}
+                    className="text-[#9370DB] hover:underline font-medium cursor-pointer"
+                  >
                     {t('termsOfService')}
-                  </Link>{' '}
+                  </button>{' '}
                   {t('and')}{' '}
-                  <Link href="/privacy" className="text-[#9370DB] hover:underline">
+                  <button
+                    type="button"
+                    onClick={() => setLegalModal('privacy')}
+                    className="text-[#9370DB] hover:underline font-medium cursor-pointer"
+                  >
                     {t('privacyPolicy')}
-                  </Link>
+                  </button>
                 </span>
               </div>
+
+              {error && (
+                <div className="px-4 py-3 rounded-md bg-red-500/10 border border-red-500/30 text-sm text-red-600 font-medium">
+                  {error}
+                </div>
+              )}
+
+              {RECAPTCHA_SITE_KEY ? (
+                <RecaptchaField onVerified={setCaptchaOk} />
+              ) : (
+                <MathCaptcha onVerified={setCaptchaOk} />
+              )}
 
               <button
                 type="submit"
@@ -198,6 +260,12 @@ export default function Signup() {
           </div>
         </div>
       </div>
+
+      <LegalModal
+        open={legalModal !== null}
+        type={legalModal ?? 'terms'}
+        onClose={() => setLegalModal(null)}
+      />
     </div>
   );
 }

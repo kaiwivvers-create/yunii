@@ -6,6 +6,7 @@ import { MessageSquare, Send, X } from 'lucide-react';
 import LoginModal from './LoginModal';
 import { loadUserData } from '@/utils/userStorage';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useBrand } from '@/contexts/BrandContext';
 
 const parseMarkdown = (text: string) => {
   // Bold: **text**
@@ -64,12 +65,14 @@ const parseMarkdown = (text: string) => {
 
 export default function Chatbot() {
   const { t } = useLanguage();
+  const { appName } = useBrand();
   const [isOpen, setIsOpen] = useState(false);
   const [message, setMessage] = useState('');
   const [chatHistory, setChatHistory] = useState<Array<{role: 'user' | 'assistant', content: string}>>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
+  const [dbPreferences, setDbPreferences] = useState<any>(null);
   const pathname = usePathname();
 
   useEffect(() => {
@@ -82,6 +85,25 @@ export default function Chatbot() {
       window.removeEventListener('userLogin', checkLogin);
     };
   }, []);
+
+  // Preferences persisted on the backend are authoritative and survive
+  // logout/login — load them so the AI can tailor answers.
+  useEffect(() => {
+    const user = localStorage.getItem('user');
+    if (!user) return;
+    try {
+      const email = JSON.parse(user).email;
+      if (!email) return;
+      fetch(`/api/preferences?email=${encodeURIComponent(email)}`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => {
+          if (d?.preferences) setDbPreferences(d.preferences);
+        })
+        .catch(() => {});
+    } catch {
+      /* ignore malformed user */
+    }
+  }, [isLoggedIn]);
 
   const handleSendMessage = async () => {
     if (!isLoggedIn) {
@@ -99,7 +121,7 @@ export default function Chatbot() {
     setChatHistory(newHistory);
 
     // Build detailed context about current page and app state
-    let context = `You are an AI assistant for UniVerse, a university discovery platform that helps students find and explore universities worldwide.\n\n`;
+    let context = `You are an AI assistant for ${appName}, a university discovery platform that helps students find and explore universities worldwide.\n\n`;
     context += `Current page: ${pathname}\n`;
     
     // Get user info
@@ -124,9 +146,10 @@ export default function Chatbot() {
         context += `User is viewing this university in the side panel. Tell them to click 'See More' for detailed information about this university.\n`;
       }
       
+      // DB preferences win (authoritative); localStorage is the fallback
       const storedPreferences = loadUserData<any>('userPreferences', null);
-      if (storedPreferences) {
-        const preferences = JSON.parse(storedPreferences);
+      const preferences = dbPreferences || storedPreferences;
+      if (preferences) {
         context += `User preferences:\n`;
         context += `- Intended major: ${preferences.intendedMajor || 'not specified'}\n`;
         context += `- Degree level: ${preferences.degreeLevel || 'not specified'}\n`;
@@ -205,7 +228,7 @@ export default function Chatbot() {
           <MessageSquare className="w-6 h-6 text-white" />
         </button>
       ) : (
-        <div className="w-96 h-[500px] bg-[#C8C8E0] dark:bg-dark-bg-secondary border border-[#A8A8C8] dark:border-dark-border rounded-lg shadow-2xl flex flex-col">
+        <div className="w-[calc(100vw-2rem)] max-w-96 h-[60vh] min-h-[320px] sm:h-[500px] bg-[#C8C8E0] dark:bg-dark-bg-secondary border border-[#A8A8C8] dark:border-dark-border rounded-lg shadow-2xl flex flex-col">
           <div className="p-4 border-b border-[#A8A8C8] dark:border-dark-border flex justify-between items-center">
             <h3 className="font-semibold text-slate-900 dark:text-dark-text">{t('aiAssistant')}</h3>
             <button

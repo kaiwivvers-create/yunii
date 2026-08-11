@@ -79,7 +79,26 @@ export default function ChatPage() {
   const [secretModeChats, setSecretModeChats] = useState<Set<string>>(new Set());
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(
+    () => typeof window !== 'undefined' && window.innerWidth >= 1024
+  );
+  const lastIsDesktop = useRef<boolean | null>(null);
+
+  // Keep the sidebar mode in sync when crossing the desktop breakpoint (e.g. tablet rotation)
+  useEffect(() => {
+    const handleResize = () => {
+      const isDesktop = window.innerWidth >= 1024;
+      const prev = lastIsDesktop.current;
+      if (prev !== null && prev !== isDesktop) {
+        setSidebarOpen(isDesktop);
+      }
+      lastIsDesktop.current = isDesktop;
+    };
+    lastIsDesktop.current = window.innerWidth >= 1024;
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [randomPrompt, setRandomPrompt] = useState<string | null>(null);
   const [waitingForPasscode, setWaitingForPasscode] = useState(false);
@@ -102,10 +121,28 @@ export default function ChatPage() {
   }, []);
 
   useEffect(() => {
-    // Load user preferences
-    const storedPreferences = localStorage.getItem('userPreferences');
+    // Load user preferences from the per-user key (loadUserData returns the
+    // parsed value, and falls back to the legacy shared key with migration)
+    const storedPreferences = loadUserData<any>('userPreferences', null);
     if (storedPreferences) {
-      setUserPreferences(JSON.parse(storedPreferences));
+      setUserPreferences(storedPreferences);
+    }
+    // The database is authoritative — it survives logout/login and other devices
+    const user = localStorage.getItem('user');
+    if (user) {
+      try {
+        const email = JSON.parse(user).email;
+        if (email) {
+          fetch(`/api/preferences?email=${encodeURIComponent(email)}`)
+            .then((r) => (r.ok ? r.json() : null))
+            .then((d) => {
+              if (d?.preferences) setUserPreferences(d.preferences);
+            })
+            .catch(() => {});
+        }
+      } catch {
+        /* ignore malformed user */
+      }
     }
   }, []);
 
@@ -332,6 +369,30 @@ export default function ChatPage() {
           }
           return chat;
         }));
+        // Save AI recommendation results when the user asked the AI to use their
+        // preferences — this feeds the recommendations table.
+        if (usePreferences) {
+          const storedUser = localStorage.getItem('user');
+          if (storedUser) {
+            try {
+              const email = JSON.parse(storedUser).email;
+              if (email) {
+                fetch('/api/recommendations', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    email,
+                    source: 'chat',
+                    query: userMessage,
+                    response: data.response,
+                  }),
+                }).catch(() => {});
+              }
+            } catch {
+              /* ignore */
+            }
+          }
+        }
       } else {
         setChats(prev => prev.map(chat => {
           if (chat.id === chatId) {
@@ -409,9 +470,17 @@ export default function ChatPage() {
       />
 
       <div className="flex flex-1 overflow-hidden relative z-10">
-        {/* Sidebar */}
+        {/* Mobile backdrop */}
         {sidebarOpen && (
-          <div className="w-64 bg-[#D8D8E8] border-r border-[#A8A8C8] p-4 flex flex-col">
+          <div
+            className="fixed inset-0 z-20 bg-black/40 backdrop-blur-sm lg:hidden"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+
+        {/* Sidebar — overlay drawer on mobile, static column on desktop */}
+        {sidebarOpen && (
+          <div className="absolute inset-y-0 left-0 z-30 lg:static w-72 lg:w-64 bg-[#D8D8E8] dark:bg-dark-bg-secondary border-r border-[#A8A8C8] dark:border-dark-border p-4 flex flex-col animate-fade-in-down lg:animate-none shadow-2xl lg:shadow-none">
             <button
               onClick={createNewChat}
               className="w-full px-4 py-3 bg-[#9370DB] text-white rounded-lg hover:bg-[#7B68EE] transition-colors mb-4 flex items-center gap-2"

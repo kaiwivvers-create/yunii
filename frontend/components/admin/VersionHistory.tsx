@@ -30,6 +30,7 @@ const formatTime = (iso: string) => {
 };
 
 export default function VersionHistory({ refreshKey }: { refreshKey?: number }) {
+  const [user, setUser] = useState<any>(null);
   const [groups, setGroups] = useState<VersionGroup[]>([]);
   const [selected, setSelected] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
@@ -39,6 +40,11 @@ export default function VersionHistory({ refreshKey }: { refreshKey?: number }) 
     version: number;
     name: string;
   } | null>(null);
+
+  useEffect(() => {
+    const stored = localStorage.getItem('user');
+    setUser(stored ? JSON.parse(stored) : null);
+  }, []);
 
   useEffect(() => {
     const load = async () => {
@@ -64,7 +70,7 @@ export default function VersionHistory({ refreshKey }: { refreshKey?: number }) 
       const res = await fetch(`/api/admin/universities/${confirm.uniId}/revert/${confirm.version}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ actor: 'admin' }),
+        body: JSON.stringify({ actor: user?.name || 'admin', actorRole: user?.role || '' }),
       });
       if (res.ok) {
         setConfirm(null);

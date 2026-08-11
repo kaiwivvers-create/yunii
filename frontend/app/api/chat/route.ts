@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getBrandSettings } from '@/utils/brand';
 
 export async function POST(request: NextRequest) {
   try {
     const { message, history, isNewChat, secretMode, context, usePreferences, userPreferences } = await request.json();
+
+    // Brand the assistant with the configured app name
+    const { appName } = await getBrandSettings();
 
     // Google Gemini API endpoint
     const apiKey = process.env.GEMINI_API_KEY;
@@ -16,15 +20,15 @@ export async function POST(request: NextRequest) {
 
     // Build system prompt with context
     let systemPrompt = secretMode 
-      ? `You are Cae, a helpful AI assistant for UniVerse, a university discovery platform that helps students find and explore universities worldwide. You can answer questions about any topic - universities, general knowledge, personal advice, or anything else the user asks. Be helpful, conversational, and provide thoughtful responses. Only introduce yourself if the user asks "who are you" or similar questions.`
-      : `You are Cae, a helpful university assistant for UniVerse, a university discovery platform that helps students find and explore universities worldwide. You answer questions related to:
+      ? `You are Cae, a helpful AI assistant for ${appName}, a university discovery platform that helps students find and explore universities worldwide. You can answer questions about any topic - universities, general knowledge, personal advice, or anything else the user asks. Be helpful, conversational, and provide thoughtful responses. Only introduce yourself if the user asks "who are you" or similar questions.`
+      : `You are Cae, a helpful university assistant for ${appName}, a university discovery platform that helps students find and explore universities worldwide. You answer questions related to:
 - Universities and colleges
 - Courses and academic programs
 - Admissions and applications
 - Scholarships and financial aid
 - Campus life and student resources
 - Study tips and academic advice
-- The UniVerse app features and navigation
+- The ${appName} app features and navigation
 
 If a user asks about anything outside these topics (medical advice, legal advice, general knowledge, etc.), politely decline and redirect them to appropriate resources. Keep responses concise and helpful. Only introduce yourself if the user asks "who are you" or similar questions.`;
 
@@ -37,8 +41,14 @@ If a user asks about anything outside these topics (medical advice, legal advice
     if (usePreferences && userPreferences) {
       let preferencesContext = '\n\nUser Preferences:\n';
       
-      if (userPreferences.intendedMajor && userPreferences.intendedMajor.length > 0) {
-        preferencesContext += `- Intended Majors: ${userPreferences.intendedMajor.join(', ')}\n`;
+      // intendedMajor may be a string (survey) or an array (settings) — normalize
+      const majors = Array.isArray(userPreferences.intendedMajor)
+        ? userPreferences.intendedMajor
+        : userPreferences.intendedMajor
+          ? [userPreferences.intendedMajor]
+          : [];
+      if (majors.length > 0) {
+        preferencesContext += `- Intended Majors: ${majors.join(', ')}\n`;
       }
       
       if (userPreferences.degreeLevel) {

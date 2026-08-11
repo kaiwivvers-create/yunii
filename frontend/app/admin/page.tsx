@@ -12,6 +12,7 @@ import DatabaseSection from '../../components/admin/DatabaseSection';
 import PermissionsSection from '../../components/admin/PermissionsSection';
 import RolesSection from '../../components/admin/RolesSection';
 import SettingsSection from '../../components/admin/SettingsSection';
+import UsersSection from '../../components/admin/UsersSection';
 import VersionHistory from '../../components/admin/VersionHistory';
 import {
   LayoutDashboard,
@@ -25,8 +26,10 @@ import {
   Trash2,
   ChevronLeft,
   MapPin,
+  ShieldCheck,
   X,
 } from 'lucide-react';
+import { isAdminRole, hasPermission, isSuperAdmin, SECTION_PERMISSION } from '@/utils/roles';
 
 type TabId = 'overview' | 'universities' | 'regions' | 'details';
 
@@ -74,7 +77,7 @@ export default function AdminDashboard() {
       return;
     }
     const parsedUser = JSON.parse(storedUser);
-    if (parsedUser.role !== 'admin') {
+    if (!isAdminRole(parsedUser.role)) {
       router.push('/explore');
       return;
     }
@@ -84,7 +87,7 @@ export default function AdminDashboard() {
     // Read the ?section= query param (e.g. when arriving from /admin/users sidebar)
     const params = new URLSearchParams(window.location.search);
     const section = params.get('section') as AdminSection | null;
-    if (section && ['overview', 'content', 'activity', 'versions', 'reports', 'database', 'roles', 'permissions', 'settings'].includes(section)) {
+    if (section && ['overview', 'content', 'users', 'activity', 'versions', 'reports', 'database', 'roles', 'permissions', 'settings'].includes(section)) {
       setActiveSection(section);
     }
   }, [router]);
@@ -107,13 +110,15 @@ export default function AdminDashboard() {
     }
   };
 
+  const actorBody = () => ({ actor: user?.name || 'admin', actorRole: user?.role || '' });
+
   const handleCreate = async () => {
     if (activeTab === 'universities') {
       try {
         const res = await fetch('/api/admin/universities', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(formData),
+          body: JSON.stringify({ ...formData, ...actorBody() }),
         });
         if (res.ok) {
           const created = await res.json();
@@ -130,7 +135,7 @@ export default function AdminDashboard() {
         const res = await fetch('/api/admin/regions', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: formData.name }),
+          body: JSON.stringify({ name: formData.name, ...actorBody() }),
         });
         const newName = formData.name.trim();
         if (res.ok && !regions.includes(newName)) {
@@ -150,7 +155,7 @@ export default function AdminDashboard() {
         const res = await fetch(`/api/admin/universities/${id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(formData),
+          body: JSON.stringify({ ...formData, ...actorBody() }),
         });
         if (res.ok) {
           const updated = await res.json();
@@ -167,7 +172,7 @@ export default function AdminDashboard() {
         const res = await fetch(`/api/admin/regions/${encodeURIComponent(String(id))}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: formData.name }),
+          body: JSON.stringify({ name: formData.name, ...actorBody() }),
         });
         const newName = formData.name.trim();
         if (res.ok) {
@@ -199,7 +204,11 @@ export default function AdminDashboard() {
   const handleDelete = async (type: 'university' | 'region', id: number | string) => {
     if (type === 'university') {
       try {
-        const res = await fetch(`/api/admin/universities/${id}`, { method: 'DELETE' });
+        const res = await fetch(`/api/admin/universities/${id}`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(actorBody()),
+        });
         if (res.ok) {
           setUniversities(universities.filter(u => u.id !== id));
           const totalPages = Math.ceil((universities.length - 1) / itemsPerPage);
@@ -212,7 +221,11 @@ export default function AdminDashboard() {
       }
     } else {
       try {
-        const res = await fetch(`/api/admin/regions/${encodeURIComponent(String(id))}`, { method: 'DELETE' });
+        const res = await fetch(`/api/admin/regions/${encodeURIComponent(String(id))}`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(actorBody()),
+        });
         if (res.ok) {
           setRegions(regions.filter(r => r !== id));
         }
@@ -233,6 +246,7 @@ export default function AdminDashboard() {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          ...actorBody(),
           details: detailsToSave,
           image: formData.image || selectedUniversity.image,
           rankings: formData.rankings,
@@ -277,7 +291,7 @@ export default function AdminDashboard() {
       const res = await fetch(`/api/admin/universities/${selectedUniversity.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ details: emptyDetails, image: '' }),
+        body: JSON.stringify({ ...actorBody(), details: emptyDetails, image: '' }),
       });
       if (res.ok) {
         const updated = await res.json();
@@ -368,13 +382,13 @@ export default function AdminDashboard() {
 
         <div className="flex gap-6 lg:gap-10 items-start">
           {/* Sidebar */}
-          <AdminSidebar active={activeSection} onNavigate={setActiveSection} />
+          <AdminSidebar active={activeSection} onNavigate={setActiveSection} user={user} />
           <div className="hidden lg:block w-px self-stretch bg-[#E2E0F0] dark:bg-dark-border" />
 
           {/* Main area */}
           <div className="flex-1 min-w-0">
             {/* Content pill tabs — shown inside the Content section */}
-            {activeSection === 'content' && (
+            {activeSection === 'content' && hasPermission(user, 'manage_content') && (
               <div className="inline-flex items-center gap-1 bg-[#EAE7F6] dark:bg-dark-bg-tertiary p-1 rounded-full mb-6 overflow-x-auto max-w-full">
                 {tabs.filter(t => t.id !== 'overview').map(({ id, label, icon: Icon }) => (
                   <button
@@ -437,8 +451,8 @@ export default function AdminDashboard() {
                   <div className="font-semibold text-slate-900 dark:text-dark-text">Add Region</div>
                   <div className="text-sm text-slate-500 dark:text-dark-text-secondary mt-1">Add a new geographic region</div>
                 </button>
-                <Link
-                  href="/admin/users"
+                <button
+                  onClick={() => setActiveSection('users')}
                   className={`${cardCls} p-5 text-left group hover:border-[#9370DB]/50 hover:shadow-md transition-all`}
                 >
                   <div className="w-10 h-10 rounded-lg bg-emerald-500/10 text-emerald-500 flex items-center justify-center mb-3 group-hover:bg-emerald-500 group-hover:text-white transition-colors">
@@ -446,7 +460,7 @@ export default function AdminDashboard() {
                   </div>
                   <div className="font-semibold text-slate-900 dark:text-dark-text">Manage Users</div>
                   <div className="text-sm text-slate-500 dark:text-dark-text-secondary mt-1">View and manage user accounts</div>
-                </Link>
+                </button>
               </div>
             </div>
 
@@ -503,7 +517,7 @@ export default function AdminDashboard() {
         )}
 
         {/* ============ UNIVERSITIES ============ */}
-        {activeSection === 'content' && activeTab === 'universities' && (
+        {activeSection === 'content' && activeTab === 'universities' && hasPermission(user, 'manage_content') && (
           <>
             {/* Toolbar */}
             <div className="flex flex-col sm:flex-row gap-3 mb-6">
@@ -544,6 +558,7 @@ export default function AdminDashboard() {
                     <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-dark-text-secondary">University</th>
                     <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-dark-text-secondary hidden md:table-cell">Location</th>
                     <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-dark-text-secondary hidden lg:table-cell">Region</th>
+                    <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-dark-text-secondary hidden xl:table-cell">Last edited by</th>
                     <th className="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-dark-text-secondary">Actions</th>
                   </tr>
                 </thead>
@@ -565,6 +580,9 @@ export default function AdminDashboard() {
                           <span className="px-2.5 py-1 bg-[#9370DB]/10 text-[#9370DB] dark:text-dark-violet rounded-full text-xs font-medium">
                             {uni.region}
                           </span>
+                        </td>
+                        <td className="px-5 py-3.5 hidden xl:table-cell text-sm text-slate-500 dark:text-dark-text-secondary">
+                          {uni.updatedBy || uni.createdBy || '—'}
                         </td>
                         <td className="px-5 py-3.5">
                           <div className="flex justify-end gap-1.5">
@@ -625,7 +643,7 @@ export default function AdminDashboard() {
         )}
 
         {/* ============ REGIONS ============ */}
-        {activeSection === 'content' && activeTab === 'regions' && (
+        {activeSection === 'content' && activeTab === 'regions' && hasPermission(user, 'manage_content') && (
           <>
             <div className="flex flex-col sm:flex-row gap-3 mb-6">
               <div className="relative flex-1">
@@ -689,7 +707,7 @@ export default function AdminDashboard() {
         )}
 
         {/* ============ DETAILS ============ */}
-        {activeSection === 'content' && activeTab === 'details' && (
+        {activeSection === 'content' && activeTab === 'details' && hasPermission(user, 'manage_content') && (
           <div className={`${cardCls} flex flex-col lg:flex-row overflow-hidden`}>
             {/* Left - University list */}
             <div className="lg:w-80 shrink-0 border-b lg:border-b-0 lg:border-r border-[#F0EEF8] dark:border-dark-border p-4 max-h-[80vh] overflow-y-auto">
@@ -752,6 +770,9 @@ export default function AdminDashboard() {
                       <div>
                         <h3 className="text-lg font-bold text-slate-900 dark:text-dark-text">{selectedUniversity.name}</h3>
                         <p className="text-sm text-slate-500 dark:text-dark-text-secondary">{selectedUniversity.location}</p>
+                        <p className="text-xs text-slate-400 dark:text-dark-text-secondary mt-0.5">
+                          Created by {selectedUniversity.createdBy || '—'} · Updated by {selectedUniversity.updatedBy || '—'}
+                        </p>
                       </div>
                     </div>
                     <span className="px-2.5 py-1 bg-[#9370DB]/10 text-[#9370DB] dark:text-dark-violet rounded-full text-xs font-medium">
@@ -1161,26 +1182,64 @@ export default function AdminDashboard() {
           </div>
         )}
 
+        {/* ============ USERS ============ */}
+        {activeSection === 'users' && hasPermission(user, 'manage_users') && <UsersSection user={user} onDataChange={fetchData} />}
+
         {/* ============ ACTIVITY LOG ============ */}
-        {activeSection === 'activity' && <ActivityLog />}
+        {activeSection === 'activity' && hasPermission(user, 'manage_system') && <ActivityLog />}
 
         {/* ============ VERSIONS ============ */}
-        {activeSection === 'versions' && <VersionHistory />}
+        {activeSection === 'versions' && hasPermission(user, 'manage_system') && <VersionHistory />}
 
         {/* ============ REPORTS ============ */}
-        {activeSection === 'reports' && <Reports />}
+        {activeSection === 'reports' && hasPermission(user, 'view_reports') && <Reports />}
 
         {/* ============ DATABASE ============ */}
-        {activeSection === 'database' && <DatabaseSection onDataChange={fetchData} />}
+        {activeSection === 'database' && hasPermission(user, 'manage_system') && <DatabaseSection onDataChange={fetchData} />}
+
+        {/* ============ ROLES / PERMISSIONS LOCKED (Super Admin only) ============ */}
+        {(activeSection === 'roles' || activeSection === 'permissions') && !isSuperAdmin(user?.role) && (
+          <div className={`${cardCls} p-12 text-center`}>
+            <div className="w-14 h-14 rounded-xl bg-purple-500/10 text-purple-500 flex items-center justify-center mx-auto mb-4">
+              <ShieldCheck className="w-7 h-7" />
+            </div>
+            <h3 className="text-lg font-bold text-slate-900 dark:text-dark-text">
+              Super Admin only
+            </h3>
+            <p className="text-sm text-slate-500 dark:text-dark-text-secondary mt-2 max-w-sm mx-auto">
+              Roles and permissions control what every admin can do — only a Super Admin can
+              manage them.
+            </p>
+          </div>
+        )}
 
         {/* ============ ROLES ============ */}
-        {activeSection === 'roles' && <RolesSection />}
+        {activeSection === 'roles' && isSuperAdmin(user?.role) && <RolesSection />}
 
         {/* ============ PERMISSIONS ============ */}
-        {activeSection === 'permissions' && <PermissionsSection />}
+        {activeSection === 'permissions' && isSuperAdmin(user?.role) && <PermissionsSection />}
 
         {/* ============ SETTINGS ============ */}
-        {activeSection === 'settings' && <SettingsSection />}
+        {activeSection === 'settings' && hasPermission(user, 'manage_settings') && <SettingsSection />}
+
+        {/* ============ NO ACCESS ============ */}
+        {activeSection !== 'overview' &&
+          activeSection !== 'roles' &&
+          activeSection !== 'permissions' &&
+          !hasPermission(user, SECTION_PERMISSION[activeSection] || '') && (
+          <div className={`${cardCls} p-12 text-center`}>
+            <div className="w-14 h-14 rounded-xl bg-red-500/10 text-red-500 flex items-center justify-center mx-auto mb-4">
+              <ShieldCheck className="w-7 h-7" />
+            </div>
+            <h3 className="text-lg font-bold text-slate-900 dark:text-dark-text">
+              You don&apos;t have access to this section
+            </h3>
+            <p className="text-sm text-slate-500 dark:text-dark-text-secondary mt-2 max-w-sm mx-auto">
+              Your role doesn&apos;t include the permission needed to view this area. Ask your
+              Super Admin to grant it via the Permissions section.
+            </p>
+          </div>
+        )}
 
         {/* ============ EDIT / CREATE MODAL ============ */}
         {isEditing && (

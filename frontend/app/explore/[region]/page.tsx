@@ -8,40 +8,6 @@ import LoginModal from '@/components/LoginModal';
 import { ChevronLeft } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 
-const regionData: Record<string, { name: string; location: string; description: string; province: string; image: string }[]> = {
-  'north-america': [
-    { name: 'Harvard University', location: 'Cambridge, USA', description: 'Ivy League research university', province: 'Massachusetts', image: 'https://images.unsplash.com/photo-1562774053-701939374585?w=800&h=600&fit=crop' },
-    { name: 'MIT', location: 'Cambridge, USA', description: 'Leading technology and engineering school', province: 'Massachusetts', image: 'https://images.unsplash.com/photo-1564981797816-1043664bf78d?w=800&h=600&fit=crop' },
-    { name: 'Stanford University', location: 'Stanford, USA', description: 'Silicon Valley research university', province: 'California', image: 'https://images.unsplash.com/photo-1571269259264-5ccb2e888cbe?w=800&h=600&fit=crop' },
-    { name: 'Yale University', location: 'New Haven, USA', description: 'Ivy League liberal arts college', province: 'Connecticut', image: 'https://images.unsplash.com/photo-1541339907198-e08756dedf3f?w=800&h=600&fit=crop' },
-  ],
-  'europe': [
-    { name: 'University of Oxford', location: 'Oxford, UK', description: 'Oldest English-speaking university', province: 'England', image: 'https://images.unsplash.com/photo-1580537659466-0a9bfa916a54?w=800&h=600&fit=crop' },
-    { name: 'University of Cambridge', location: 'Cambridge, UK', description: 'Historic research university', province: 'England', image: 'https://images.unsplash.com/photo-1592500565497-991d3e2e5f9a?w=800&h=600&fit=crop' },
-    { name: 'ETH Zurich', location: 'Zurich, Switzerland', description: 'Leading technical university', province: 'Zurich', image: 'https://images.unsplash.com/photo-1555861496-0666c8981751?w=800&h=600&fit=crop' },
-    { name: 'Imperial College London', location: 'London, UK', description: 'Science-based institution', province: 'England', image: 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=800&h=600&fit=crop' },
-  ],
-  'asia': [
-    { name: 'National University of Singapore', location: 'Singapore', description: 'Leading Asian university', province: 'Singapore', image: 'https://images.unsplash.com/photo-1525635313341-29744db9f37d?w=800&h=600&fit=crop' },
-    { name: 'Tsinghua University', location: 'Beijing, China', description: 'Leading Chinese university', province: 'Beijing', image: 'https://images.unsplash.com/photo-1509062522246-3755977927d7?w=800&h=600&fit=crop' },
-    { name: 'University of Tokyo', location: 'Tokyo, Japan', description: 'Japan\'s top university', province: 'Tokyo', image: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&h=600&fit=crop' },
-    { name: 'Peking University', location: 'Beijing, China', description: 'Historic Chinese university', province: 'Beijing', image: 'https://images.unsplash.com/photo-1577896851231-70ef18881754?w=800&h=600&fit=crop' },
-  ],
-  'oceania': [
-    { name: 'Australian National University', location: 'Canberra, Australia', description: 'National research university', province: 'Australian Capital Territory', image: 'https://images.unsplash.com/photo-1555861496-0666c8981751?w=800&h=600&fit=crop' },
-    { name: 'University of Melbourne', location: 'Melbourne, Australia', description: 'Australia\'s top university', province: 'Victoria', image: 'https://images.unsplash.com/photo-1577896851231-70ef18881754?w=800&h=600&fit=crop' },
-    { name: 'University of Sydney', location: 'Sydney, Australia', description: 'Leading Australian university', province: 'New South Wales', image: 'https://images.unsplash.com/photo-1555861496-0666c8981751?w=800&h=600&fit=crop' },
-  ],
-  'south-america': [
-    { name: 'University of São Paulo', location: 'São Paulo, Brazil', description: 'Brazil\'s largest university', province: 'São Paulo', image: 'https://images.unsplash.com/photo-1483729558449-99ef09a8c325?w=800&h=600&fit=crop' },
-    { name: 'University of Buenos Aires', location: 'Buenos Aires, Argentina', description: 'Argentina\'s top university', province: 'Buenos Aires', image: 'https://images.unsplash.com/photo-1518391846015-55a9cc003b25?w=800&h=600&fit=crop' },
-  ],
-  'africa': [
-    { name: 'University of Cape Town', location: 'Cape Town, South Africa', description: 'Africa\'s leading university', province: 'Western Cape', image: 'https://images.unsplash.com/photo-1580060839134-75a5edca2e99?w=800&h=600&fit=crop' },
-    { name: 'Stellenbosch University', location: 'Stellenbosch, South Africa', description: 'Top South African university', province: 'Western Cape', image: 'https://images.unsplash.com/photo-1580060839134-75a5edca2e99?w=800&h=600&fit=crop' },
-  ],
-};
-
 const regionNames: Record<string, string> = {
   'north-america': 'North America',
   'europe': 'Europe',
@@ -50,6 +16,8 @@ const regionNames: Record<string, string> = {
   'south-america': 'South America',
   'africa': 'Africa',
 };
+
+const slugify = (name: string) => name.toLowerCase().replace(/\s+/g, '-');
 
 export default function RegionPage() {
   const { t } = useLanguage();
@@ -62,8 +30,8 @@ export default function RegionPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
   const [expandedRegion, setExpandedRegion] = useState<string | null>(region);
+  const [universities, setUniversities] = useState<any[]>([]);
 
-  const universities = regionData[region] || [];
   const regionName = regionNames[region] || 'Region';
 
   useEffect(() => {
@@ -72,7 +40,23 @@ export default function RegionPage() {
     if (storedUser) {
       setUser(JSON.parse(storedUser));
     }
-  }, []);
+
+    // Load universities for this region from the database
+    let cancelled = false;
+    fetch('/api/admin/universities')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((list: any[]) => {
+        if (cancelled) return;
+        const filtered = list.filter(
+          (u) => u.region && slugify(u.region) === region,
+        );
+        setUniversities(filtered);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [region]);
 
   const handleLogout = () => {
     // Preserve profile data before clearing user
@@ -132,13 +116,13 @@ export default function RegionPage() {
             {t('universitiesIn', { region: regionName })}
           </h1>
 
-          <div className="flex gap-8">
+          <div className="flex flex-col md:flex-row gap-8">
             {/* Left side - Universities */}
             <div className="flex-1">
               <div className="grid md:grid-cols-2 gap-4">
                 {getFilteredUniversities().map((uni, index) => (
                   <div
-                    key={index}
+                    key={uni.id || index}
                     onClick={() => handleUniClick(uni)}
                     className="bg-[#C8C8E0] border border-[#A8A8C8] rounded-lg p-6 hover:border-[#9370DB] transition-colors cursor-pointer"
                   >
@@ -153,17 +137,17 @@ export default function RegionPage() {
               )}
             </div>
 
-            {/* Right side - Provinces */}
-            <div className="w-64">
+            {/* Right side - Provinces (horizontal chips on mobile, column on desktop) */}
+            <div className="md:w-64 shrink-0">
               <h2 className="text-xl font-semibold text-slate-900 mb-4">
                 {t('provincesIn', { region: regionName })}
               </h2>
-              <div className="space-y-2">
+              <div className="flex flex-wrap md:flex-col gap-2">
                 {getProvinces().map((province) => (
                   <button
                     key={province}
                     onClick={() => setSelectedProvince(province)}
-                    className={`w-full text-left px-4 py-2 rounded-lg transition-colors ${
+                    className={`px-4 py-2 rounded-lg transition-colors md:w-full md:text-left ${
                       selectedProvince === province
                         ? 'bg-[#9370DB] text-white'
                         : 'bg-[#C8C8E0] text-slate-800 hover:bg-[#A8A8C8]'

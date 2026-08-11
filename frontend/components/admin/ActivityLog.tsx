@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import ConfirmModal from '../ConfirmModal';
+import { isSuperAdmin } from '@/utils/roles';
 import {
   ScrollText,
   RotateCcw,
@@ -65,6 +66,7 @@ export default function ActivityLog({ refreshKey }: { refreshKey?: number }) {
   const [log, setLog] = useState<LogEntry[]>([]);
   const [trash, setTrash] = useState<TrashItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<any>(null);
   const [confirm, setConfirm] = useState<{
     title: string;
     message: string;
@@ -88,6 +90,8 @@ export default function ActivityLog({ refreshKey }: { refreshKey?: number }) {
   };
 
   useEffect(() => {
+    const stored = localStorage.getItem('user');
+    setUser(stored ? JSON.parse(stored) : null);
     fetchData();
   }, [refreshKey]);
 
@@ -96,7 +100,7 @@ export default function ActivityLog({ refreshKey }: { refreshKey?: number }) {
       const res = await fetch(`/api/admin/trash/${trashId}/restore`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ actor: 'admin' }),
+        body: JSON.stringify({ actor: user?.name || 'admin', actorRole: user?.role || '' }),
       });
       if (res.ok) await fetchData();
     } catch (err) {
@@ -109,7 +113,7 @@ export default function ActivityLog({ refreshKey }: { refreshKey?: number }) {
       const res = await fetch(`/api/admin/trash/${trashId}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ actor: 'admin' }),
+        body: JSON.stringify({ actor: user?.name || 'admin', actorRole: user?.role || '' }),
       });
       if (res.ok) await fetchData();
     } catch (err) {
@@ -124,7 +128,7 @@ export default function ActivityLog({ refreshKey }: { refreshKey?: number }) {
       const res = await fetch(`/api/admin/universities/${entry.entityId}/revert/${version - 1}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ actor: 'admin' }),
+        body: JSON.stringify({ actor: user?.name || 'admin', actorRole: user?.role || '' }),
       });
       if (res.ok) await fetchData();
     } catch (err) {
@@ -211,34 +215,42 @@ export default function ActivityLog({ refreshKey }: { refreshKey?: number }) {
                         </div>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
-                        <button
-                          onClick={() =>
-                            setConfirm({
-                              title: 'Revert deletion',
-                              message: `Restore "${item.item.name || item.item.email}" back to your content?`,
-                              danger: false,
-                              action: () => restoreTrash(item.id),
-                            })
-                          }
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#9370DB]/10 text-[#9370DB] dark:text-dark-violet rounded-lg text-sm font-medium hover:bg-[#9370DB] hover:text-white transition-colors"
-                        >
-                          <RotateCcw className="w-3.5 h-3.5" />
-                          Revert
-                        </button>
-                        <button
-                          onClick={() =>
-                            setConfirm({
-                              title: 'Delete permanently',
-                              message: `Permanently delete "${item.item.name || item.item.email}"? This cannot be undone.`,
-                              danger: true,
-                              action: () => deleteForever(item.id),
-                            })
-                          }
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 text-red-500 rounded-lg text-sm font-medium hover:bg-red-500 hover:text-white transition-colors"
-                        >
-                          <XCircle className="w-3.5 h-3.5" />
-                          Delete forever
-                        </button>
+                        {isSuperAdmin(user?.role) ? (
+                          <>
+                            <button
+                              onClick={() =>
+                                setConfirm({
+                                  title: 'Revert deletion',
+                                  message: `Restore "${item.item.name || item.item.email}" back to your content?`,
+                                  danger: false,
+                                  action: () => restoreTrash(item.id),
+                                })
+                              }
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#9370DB]/10 text-[#9370DB] dark:text-dark-violet rounded-lg text-sm font-medium hover:bg-[#9370DB] hover:text-white transition-colors"
+                            >
+                              <RotateCcw className="w-3.5 h-3.5" />
+                              Revert
+                            </button>
+                            <button
+                              onClick={() =>
+                                setConfirm({
+                                  title: 'Delete permanently',
+                                  message: `Permanently delete "${item.item.name || item.item.email}"? This cannot be undone.`,
+                                  danger: true,
+                                  action: () => deleteForever(item.id),
+                                })
+                              }
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 text-red-500 rounded-lg text-sm font-medium hover:bg-red-500 hover:text-white transition-colors"
+                            >
+                              <XCircle className="w-3.5 h-3.5" />
+                              Delete forever
+                            </button>
+                          </>
+                        ) : (
+                          <span className="text-xs text-slate-400 dark:text-dark-text-secondary italic">
+                            Super Admin only
+                          </span>
+                        )}
                       </div>
                     </div>
                   );
@@ -299,7 +311,7 @@ export default function ActivityLog({ refreshKey }: { refreshKey?: number }) {
                       >
                         <RotateCcw className="w-4 h-4" />
                       </button>
-                      {entry.action === 'deleted' && entry.meta?.trashId && (
+                      {entry.action === 'deleted' && entry.meta?.trashId && isSuperAdmin(user?.role) && (
                         <button
                           onClick={() =>
                             setConfirm({

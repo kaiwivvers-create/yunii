@@ -13,6 +13,7 @@ import {
   Settings,
   UserCog,
 } from 'lucide-react';
+import { hasPermission, isSuperAdmin, SECTION_PERMISSION } from '@/utils/roles';
 
 export type AdminSection =
   | 'overview'
@@ -36,7 +37,7 @@ interface SidebarItem {
 const items: SidebarItem[] = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard, href: '/admin' },
   { id: 'content', label: 'Content', icon: GraduationCap, href: '/admin?section=content' },
-  { id: 'users', label: 'Users', icon: Users, href: '/admin/users' },
+  { id: 'users', label: 'Users', icon: Users, href: '/admin?section=users' },
   { id: 'activity', label: 'Activity Log', icon: ScrollText, href: '/admin?section=activity' },
   { id: 'versions', label: 'Versions', icon: History, href: '/admin?section=versions' },
   { id: 'reports', label: 'Reports', icon: BarChart3, href: '/admin?section=reports' },
@@ -49,13 +50,23 @@ const items: SidebarItem[] = [
 interface AdminSidebarProps {
   active: AdminSection;
   onNavigate?: (section: AdminSection) => void;
+  /** Logged-in user; sections they lack permission for are hidden. */
+  user?: any;
 }
 
-export default function AdminSidebar({ active, onNavigate }: AdminSidebarProps) {
+export default function AdminSidebar({ active, onNavigate, user }: AdminSidebarProps) {
+  // Roles & Permissions are system-level sections — Super Admin only.
+  const superAdminOnly = new Set(['roles', 'permissions']);
+  const visibleItems = items.filter(
+    (item) =>
+      item.id === 'overview' ||
+      (superAdminOnly.has(item.id) ? isSuperAdmin(user?.role) : hasPermission(user, SECTION_PERMISSION[item.id] || '')),
+  );
+
   return (
     <aside className="w-16 lg:w-56 shrink-0">
       <div className="sticky top-20 space-y-1">
-        {items.map(({ id, label, icon: Icon, href }) => {
+        {visibleItems.map(({ id, label, icon: Icon, href }) => {
           const isActive = active === id;
           const cls = `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all w-full ${
             isActive
@@ -68,16 +79,15 @@ export default function AdminSidebar({ active, onNavigate }: AdminSidebarProps) 
               <span className="hidden lg:inline whitespace-nowrap">{label}</span>
             </>
           );
-          // 'users' is a separate route — always navigate to it (in-page sections can't render it)
-          const isRouteLink = onNavigate && id === 'users';
-          return isRouteLink || !onNavigate ? (
-            <Link key={id} href={href} className={cls} title={label}>
-              {inner}
-            </Link>
-          ) : (
+          // In-page sections call onNavigate; when it's absent (standalone use) fall back to the href link.
+          return onNavigate ? (
             <button key={id} onClick={() => onNavigate(id)} className={cls} title={label}>
               {inner}
             </button>
+          ) : (
+            <Link key={id} href={href} className={cls} title={label}>
+              {inner}
+            </Link>
           );
         })}
       </div>

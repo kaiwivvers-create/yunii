@@ -26,14 +26,24 @@ export function applyAppBranding(appName: string, appIcon: string) {
 
 export default function SettingsSection() {
   const fileRef = useRef<HTMLInputElement>(null);
+  const [user, setUser] = useState<any>(null);
   const [appName, setAppName] = useState('UniVerse');
   const [appIcon, setAppIcon] = useState('');
+  const [address, setAddress] = useState('');
+  const [managerName, setManagerName] = useState('');
+  const [contactEmail, setContactEmail] = useState('');
+  const [contactPhone, setContactPhone] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
 
   // Crop state (source image data URL / object URL while the cropper is open)
   const [cropSrc, setCropSrc] = useState<string | null>(null);
+
+  useEffect(() => {
+    const stored = localStorage.getItem('user');
+    setUser(stored ? JSON.parse(stored) : null);
+  }, []);
 
   useEffect(() => {
     const load = async () => {
@@ -43,6 +53,10 @@ export default function SettingsSection() {
           const data = await res.json();
           setAppName(data.appName || 'UniVerse');
           setAppIcon(data.appIcon || '');
+          setAddress(data.address || '');
+          setManagerName(data.managerName || '');
+          setContactEmail(data.contactEmail || '');
+          setContactPhone(data.contactPhone || '');
         }
       } catch (err) {
         console.error(err);
@@ -69,13 +83,32 @@ export default function SettingsSection() {
       const res = await fetch('/api/admin/settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ appName, appIcon }),
+        body: JSON.stringify({
+          appName,
+          appIcon,
+          address,
+          managerName,
+          contactEmail,
+          contactPhone,
+          actor: user?.name || 'admin',
+          actorRole: user?.role || '',
+        }),
       });
       if (res.ok) {
         const data = await res.json();
         applyAppBranding(data.appName, data.appIcon);
         setAppName(data.appName);
         setAppIcon(data.appIcon);
+        // Persist + notify every tab/component so the new brand applies instantly.
+        try {
+          localStorage.setItem(
+            'appBranding',
+            JSON.stringify({ appName: data.appName, appIcon: data.appIcon }),
+          );
+        } catch {
+          /* ignore quota errors */
+        }
+        window.dispatchEvent(new Event('appBrandingChanged'));
         setFlash('App name & icon saved — check your browser tab!');
       } else {
         setFlash('Failed to save settings');
@@ -156,6 +189,61 @@ export default function SettingsSection() {
             <p className="text-xs text-slate-500 dark:text-dark-text-secondary mt-1.5">
               Upload any image — you'll crop it to a square before saving.
             </p>
+          </div>
+          <div className="pt-2 border-t border-[#F0EEF8] dark:border-dark-border space-y-4">
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-dark-text-secondary">
+              Company Info
+            </p>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-dark-text-secondary mb-1.5">
+                Address
+              </label>
+              <input
+                type="text"
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                placeholder="e.g. 123 University Ave, Jakarta"
+                className={inputCls}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-dark-text-secondary mb-1.5">
+                Manager / Owner
+              </label>
+              <input
+                type="text"
+                value={managerName}
+                onChange={(e) => setManagerName(e.target.value)}
+                placeholder="e.g. Kai Han"
+                className={inputCls}
+              />
+            </div>
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-dark-text-secondary mb-1.5">
+                  Contact Email
+                </label>
+                <input
+                  type="email"
+                  value={contactEmail}
+                  onChange={(e) => setContactEmail(e.target.value)}
+                  placeholder="contact@universe.app"
+                  className={inputCls}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-dark-text-secondary mb-1.5">
+                  Contact Phone / WhatsApp
+                </label>
+                <input
+                  type="text"
+                  value={contactPhone}
+                  onChange={(e) => setContactPhone(e.target.value)}
+                  placeholder="+62 812 3456 7890"
+                  className={inputCls}
+                />
+              </div>
+            </div>
           </div>
           <div className="flex items-center gap-3 pt-2">
             <button

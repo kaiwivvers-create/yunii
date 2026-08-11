@@ -34,6 +34,12 @@ export default function RolesSection({ refreshKey }: { refreshKey?: number }) {
   const [flashError, setFlashError] = useState(false);
   const [modal, setModal] = useState<null | { role: RoleRow | null; name: string; permissions: string[] }>(null);
   const [confirm, setConfirm] = useState<null | { role: RoleRow; action: () => void }>(null);
+  const [user, setUser] = useState<any>(null);
+
+  useEffect(() => {
+    const stored = localStorage.getItem('user');
+    setUser(stored ? JSON.parse(stored) : null);
+  }, []);
 
   const load = async () => {
     try {
@@ -70,7 +76,12 @@ export default function RolesSection({ refreshKey }: { refreshKey?: number }) {
       const res = await fetch(isEdit ? `/api/admin/roles/${modal.role!.id}` : '/api/admin/roles', {
         method: isEdit ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: modal.name, permissions: modal.permissions }),
+        body: JSON.stringify({
+          name: modal.name,
+          permissions: modal.permissions,
+          actor: user?.name || 'admin',
+          actorRole: user?.role || '',
+        }),
       });
       if (res.ok) {
         setFlash(isEdit ? 'Role updated' : 'Role created');
@@ -91,7 +102,11 @@ export default function RolesSection({ refreshKey }: { refreshKey?: number }) {
 
   const deleteRole = async (id: number) => {
     try {
-      const res = await fetch(`/api/admin/roles/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/admin/roles/${id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ actor: user?.name || 'admin', actorRole: user?.role || '' }),
+      });
       if (res.ok) {
         setFlash('Role deleted');
         setFlashError(false);

@@ -1,6 +1,8 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { useBrand } from './BrandContext';
+import { subBrand } from '@/utils/brand';
 
 export type Lang = 'en' | 'zh' | 'id';
 
@@ -45,6 +47,17 @@ const dict: Dict = {
   allRegions: { en: 'All Regions', zh: '全部地区', id: 'Semua Wilayah' },
   universitiesFound: { en: 'universities', zh: '所大学', id: 'universitas' },
   noRegionsMatch: { en: 'No regions match your filters', zh: '没有符合筛选的地区', id: 'Tidak ada wilayah yang cocok dengan filter Anda' },
+  filters: { en: 'Filters', zh: '筛选', id: 'Filter' },
+  majorFilter: { en: 'Major / Program', zh: '专业/课程', id: 'Jurusan / Program' },
+  allMajors: { en: 'All majors', zh: '全部专业', id: 'Semua jurusan' },
+  allBudgets: { en: 'Any budget', zh: '任意预算', id: 'Anggaran apa pun' },
+  programsN: { en: '{n} programs', zh: '{n}个专业', id: '{n} program' },
+  scholarshipsN: { en: '{n} scholarships', zh: '{n}项奖学金', id: '{n} beasiswa' },
+  preferenceFiltersApplied: {
+    en: 'Filtering by your saved preferences (regions, budget, major)',
+    zh: '根据您的已保存偏好筛选（地区、预算、专业）',
+    id: 'Menyaring berdasarkan preferensi tersimpan Anda (wilayah, anggaran, jurusan)',
+  },
 
   // University page
   overview: { en: 'Overview', zh: '学校概况', id: 'Ringkasan' },
@@ -156,7 +169,7 @@ const dict: Dict = {
   programsStat: { en: 'Programs', zh: '课程', id: 'Program' },
   studentsStat: { en: 'Students', zh: '学生', id: 'Mahasiswa' },
   exploreUniversities: { en: 'Explore Universities', zh: '探索大学', id: 'Jelajahi Universitas' },
-  whyUniverse: { en: 'Why UniVerse?', zh: '为什么选择 UniVerse？', id: 'Mengapa UniVerse?' },
+  whyUniverse: { en: 'Why {appName}?', zh: '为什么选择 {appName}？', id: 'Mengapa {appName}?' },
   whyUniverseSubtitle: {
     en: 'Everything you need to find your perfect university',
     zh: '找到理想大学所需的一切',
@@ -182,9 +195,9 @@ const dict: Dict = {
   },
   readyToStart: { en: 'Ready to Start Your Journey?', zh: '准备好开始你的旅程了吗？', id: 'Siap Memulai Perjalanan Anda?' },
   readyToStartDesc: {
-    en: 'Join millions of students who found their perfect university through UniVerse',
-    zh: '加入数百万通过 UniVerse 找到理想大学的学生',
-    id: 'Bergabunglah dengan jutaan mahasiswa yang menemukan universitas impian melalui UniVerse',
+    en: 'Join millions of students who found their perfect university through {appName}',
+    zh: '加入数百万通过 {appName} 找到理想大学的学生',
+    id: 'Bergabunglah dengan jutaan mahasiswa yang menemukan universitas impian melalui {appName}',
   },
   createFreeAccount: { en: 'Create Free Account', zh: '创建免费账户', id: 'Buat Akun Gratis' },
   footerTagline: { en: 'Your gateway to universities worldwide.', zh: '通往世界大学的门户。', id: 'Gerbang Anda menuju universitas di seluruh dunia.' },
@@ -211,7 +224,7 @@ const dict: Dict = {
   welcomeBackTitle: { en: 'Welcome back', zh: '欢迎回来', id: 'Selamat Datang Kembali' },
   signInToContinue: { en: 'Sign in to your account to continue', zh: '登录您的账户以继续', id: 'Masuk ke akun Anda untuk melanjutkan' },
   dontHaveAccount: { en: "Don't have an account?", zh: '还没有账户？', id: 'Belum punya akun?' },
-  signInToUniverse: { en: 'Sign in to UniVerse', zh: '登录 UniVerse', id: 'Masuk ke UniVerse' },
+  signInToUniverse: { en: 'Sign in to {appName}', zh: '登录 {appName}', id: 'Masuk ke {appName}' },
   welcomeBackDetails: {
     en: 'Welcome back! Please enter your details',
     zh: '欢迎回来！请输入您的详细信息',
@@ -230,11 +243,13 @@ const dict: Dict = {
     zh: '开始寻找理想大学的旅程',
     id: 'Mulai perjalanan Anda menemukan universitas impian',
   },
-  signUpForUniverse: { en: 'Sign up for UniVerse', zh: '注册 UniVerse', id: 'Daftar ke UniVerse' },
+  signUpForUniverse: { en: 'Sign up for {appName}', zh: '注册 {appName}', id: 'Daftar ke {appName}' },
   createYourAccount: { en: 'Create your account to get started', zh: '创建您的账户以开始', id: 'Buat akun Anda untuk memulai' },
   fullName: { en: 'Full Name', zh: '姓名', id: 'Nama Lengkap' },
   confirmPassword: { en: 'Confirm Password', zh: '确认密码', id: 'Konfirmasi Kata Sandi' },
   iAgreeTo: { en: 'I agree to the', zh: '我同意', id: 'Saya setuju dengan' },
+  iAgree: { en: 'I Agree', zh: '我同意', id: 'Saya Setuju' },
+  gotIt: { en: 'Got it', zh: '知道了', id: 'Baiklah' },
   termsOfService: { en: 'Terms of Service', zh: '服务条款', id: 'Ketentuan Layanan' },
   and: { en: 'and', zh: '和', id: 'dan' },
   creatingAccount: { en: 'Creating account...', zh: '正在创建账户...', id: 'Membuat akun...' },
@@ -242,8 +257,45 @@ const dict: Dict = {
   passwordsDoNotMatch: { en: 'Passwords do not match', zh: '密码不匹配', id: 'Kata sandi tidak cocok' },
   signupFailed: { en: 'Signup failed', zh: '注册失败', id: 'Pendaftaran gagal' },
 
+  // Forgot password page
+  forgotPasswordTitle: { en: 'Reset your password', zh: '重置密码', id: 'Atur Ulang Kata Sandi' },
+  forgotPasswordDesc: {
+    en: "Enter the email you signed up with and we'll send you a link to reset your password.",
+    zh: '请输入您注册时使用的邮箱，我们将向您发送重置密码的链接。',
+    id: 'Masukkan email yang Anda gunakan saat mendaftar dan kami akan mengirimkan tautan untuk mengatur ulang kata sandi Anda.',
+  },
+  sendResetLink: { en: 'Send reset link', zh: '发送重置链接', id: 'Kirim Tautan Reset' },
+  resetLinkSent: {
+    en: 'If an account exists for {email}, a password reset link has been sent to that address.',
+    zh: '如果 {email} 对应的账户存在，重置链接已发送至该邮箱。',
+    id: 'Jika akun untuk {email} ada, tautan reset kata sandi telah dikirim ke alamat tersebut.',
+  },
+  backToLogin: { en: 'Back to login', zh: '返回登录', id: 'Kembali ke Login' },
+  captchaRequired: {
+    en: 'Please complete the security check first.',
+    zh: '请先完成安全验证。',
+    id: 'Silakan selesaikan pemeriksaan keamanan terlebih dahulu.',
+  },
+
   // Profile
   username: { en: 'Username', zh: '用户名', id: 'Nama Pengguna' },
+  myRecommendations: { en: 'My Recommendations', zh: '我的推荐', id: 'Rekomendasi Saya' },
+  recommendationsTitle: { en: 'My AI Recommendations', zh: '我的 AI 推荐', id: 'Rekomendasi AI Saya' },
+  recommendationsSubtitle: {
+    en: 'Universities and advice the AI suggested based on your preferences',
+    zh: 'AI 根据您的偏好推荐的大学与建议',
+    id: 'Universitas dan saran yang disarankan AI berdasarkan preferensi Anda',
+  },
+  noRecommendations: {
+    en: 'No recommendations yet. Ask the AI for university suggestions with “Based on my preferences” turned on, and they will appear here.',
+    zh: '还没有推荐。开启“根据我的偏好”向 AI 咨询大学建议，推荐会显示在这里。',
+    id: 'Belum ada rekomendasi. Minta saran universitas ke AI dengan mengaktifkan “Berdasarkan preferensi saya”, dan rekomendasinya akan muncul di sini.',
+  },
+  askAiNow: { en: 'Ask the AI now', zh: '立即咨询 AI', id: 'Tanyakan ke AI sekarang' },
+  deleteRecommendation: { en: 'Delete recommendation', zh: '删除推荐', id: 'Hapus rekomendasi' },
+  sourceChat: { en: 'Chat', zh: '聊天', id: 'Obrolan' },
+  sourceSurvey: { en: 'Survey', zh: '问卷', id: 'Survei' },
+  sourceExplore: { en: 'Explore', zh: '探索', id: 'Jelajahi' },
   save: { en: 'Save', zh: '保存', id: 'Simpan' },
   cancel: { en: 'Cancel', zh: '取消', id: 'Batal' },
   editProfile: { en: 'Edit Profile', zh: '编辑资料', id: 'Edit Profil' },
@@ -393,9 +445,9 @@ const dict: Dict = {
   demoEmail: { en: '📧 Demo email — sent to {email}', zh: '📧 演示邮件——已发送至 {email}', id: '📧 Email demo — dikirim ke {email}' },
   subjectVerify: { en: 'Subject: Verify your email', zh: '主题：验证您的邮箱', id: 'Subjek: Verifikasi email Anda' },
   verificationCodeIs: {
-    en: 'Your UniVerse verification code is',
-    zh: '您的 UniVerse 验证码是',
-    id: 'Kode verifikasi UniVerse Anda adalah',
+    en: 'Your {appName} verification code is',
+    zh: '您的 {appName} 验证码是',
+    id: 'Kode verifikasi {appName} Anda adalah',
   },
   sixDigitCode: { en: '6-digit code', zh: '6位验证码', id: 'Kode 6 digit' },
   verifying: { en: 'Verifying...', zh: '验证中...', id: 'Memverifikasi...' },
@@ -498,7 +550,7 @@ const dict: Dict = {
 
   // Floating chatbot
   aiAssistant: { en: 'AI Assistant', zh: 'AI 助手', id: 'Asisten AI' },
-  aiWelcome: { en: "Hi! I'm your UniVerse AI assistant.", zh: '你好！我是 UniVerse 的 AI 助手。', id: 'Hai! Saya asisten AI UniVerse.' },
+  aiWelcome: { en: "Hi! I'm your {appName} AI assistant.", zh: '你好！我是 {appName} 的 AI 助手。', id: 'Hai! Saya asisten AI {appName}.' },
   aiWelcomeUni: {
     en: 'I can answer questions about this university, its programs, admissions, and help you compare it with other options.',
     zh: '我可以回答关于这所大学、专业、申请的问题，并帮你与其他选择进行对比。',
@@ -537,6 +589,110 @@ const dict: Dict = {
     zh: '（未设置偏好——请前往设置添加）',
     id: '(Belum ada preferensi - buka Pengaturan untuk menambahkannya)',
   },
+
+  // Reset password page
+  resetPasswordTitle: { en: 'Set a new password', zh: '设置新密码', id: 'Atur Kata Sandi Baru' },
+  resetPasswordDesc: {
+    en: 'Choose a new password for your account. It must be at least 6 characters.',
+    zh: '为您的账户设置新密码。密码至少需要6个字符。',
+    id: 'Pilih kata sandi baru untuk akun Anda. Minimal 6 karakter.',
+  },
+  newPassword: { en: 'New password', zh: '新密码', id: 'Kata Sandi Baru' },
+  confirmNewPassword: { en: 'Confirm new password', zh: '确认新密码', id: 'Konfirmasi Kata Sandi Baru' },
+  resetPasswordBtn: { en: 'Reset password', zh: '重置密码', id: 'Atur Ulang Kata Sandi' },
+  resetSuccess: {
+    en: 'Password updated! You can now sign in with your new password.',
+    zh: '密码已更新！您现在可以使用新密码登录。',
+    id: 'Kata sandi diperbarui! Anda sekarang dapat masuk dengan kata sandi baru.',
+  },
+  resetFailed: { en: 'Reset failed', zh: '重置失败', id: 'Reset gagal' },
+  resetTokenInvalid: {
+    en: 'This reset link is invalid or has expired. Please request a new one.',
+    zh: '此重置链接无效或已过期。请重新申请。',
+    id: 'Tautan reset ini tidak valid atau telah kedaluwarsa. Silakan minta yang baru.',
+  },
+  passwordTooShort: {
+    en: 'Password must be at least 6 characters',
+    zh: '密码至少需要6个字符',
+    id: 'Kata sandi minimal 6 karakter',
+  },
+  invalidToken: {
+    en: 'Missing reset token. Please request a new link from the login page.',
+    zh: '缺少重置令牌。请从登录页面重新申请链接。',
+    id: 'Token reset tidak ada. Silakan minta tautan baru dari halaman masuk.',
+  },
+  demoResetLink: { en: 'Demo mode — reset link', zh: '演示模式——重置链接', id: 'Mode demo — tautan reset' },
+  somethingWentWrong: {
+    en: 'Something went wrong. Please try again.',
+    zh: '出了点问题，请重试。',
+    id: 'Terjadi kesalahan. Silakan coba lagi.',
+  },
+
+  // Reviews & ratings
+  reviews: { en: 'Reviews', zh: '评价', id: 'Ulasan' },
+  averageRating: { en: 'Average rating', zh: '平均评分', id: 'Rata-rata Penilaian' },
+  noReviewsYet: {
+    en: 'No reviews yet. Be the first to share your experience!',
+    zh: '还没有评价。成为第一个分享体验的人吧！',
+    id: 'Belum ada ulasan. Jadilah yang pertama berbagi pengalaman Anda!',
+  },
+  signInToReview: {
+    en: 'Sign in to write a review',
+    zh: '登录后写评价',
+    id: 'Masuk untuk menulis ulasan',
+  },
+  writeAReview: { en: 'Write a review', zh: '写评价', id: 'Tulis Ulasan' },
+  yourRating: { en: 'Your rating', zh: '您的评分', id: 'Penilaian Anda' },
+  yourReview: { en: 'Your review', zh: '您的评价', id: 'Ulasan Anda' },
+  reviewPlaceholder: {
+    en: 'Share your experience — academics, campus life, location...',
+    zh: '分享您的体验——学术、校园生活、地理位置……',
+    id: 'Bagikan pengalaman Anda — akademik, kehidupan kampus, lokasi...',
+  },
+  submitReview: { en: 'Submit review', zh: '提交评价', id: 'Kirim Ulasan' },
+  submitting: { en: 'Submitting...', zh: '提交中...', id: 'Mengirim...' },
+  reviewSubmitted: { en: 'Review submitted — thank you!', zh: '评价已提交——谢谢！', id: 'Ulasan terkirim — terima kasih!' },
+  reviewFailed: { en: 'Could not submit review. Please try again.', zh: '无法提交评价，请重试。', id: 'Tidak dapat mengirim ulasan. Silakan coba lagi.' },
+  deleteReview: { en: 'Delete review', zh: '删除评价', id: 'Hapus Ulasan' },
+  verifiedReviewer: { en: 'Verified', zh: '已认证', id: 'Terverifikasi' },
+  ratingOutOf5: { en: 'out of 5', zh: '满分5分', id: 'dari 5' },
+
+  // Application tracker
+  applicationTracker: { en: 'Application Tracker', zh: '申请跟踪', id: 'Pelacak Aplikasi' },
+  myApplications: { en: 'My Applications', zh: '我的申请', id: 'Aplikasi Saya' },
+  noApplications: {
+    en: 'No applications yet. Add universities you are applying to and track your progress.',
+    zh: '还没有申请。添加您正在申请的大学并跟踪进度。',
+    id: 'Belum ada aplikasi. Tambahkan universitas yang Anda lamar dan pantau progresnya.',
+  },
+  addApplication: { en: 'Add application', zh: '添加申请', id: 'Tambah Aplikasi' },
+  selectUniversity: { en: 'Select a university...', zh: '选择大学...', id: 'Pilih universitas...' },
+  selectStatus: { en: 'Select status', zh: '选择状态', id: 'Pilih status' },
+  status: { en: 'Status', zh: '状态', id: 'Status' },
+  notes: { en: 'Notes', zh: '备注', id: 'Catatan' },
+  notesPlaceholder: {
+    en: 'Deadlines, requirements, contacts...',
+    zh: '截止日期、要求、联系方式……',
+    id: 'Tenggat waktu, persyaratan, kontak...',
+  },
+  deleteApplication: { en: 'Delete application', zh: '删除申请', id: 'Hapus Aplikasi' },
+  statusResearching: { en: 'Researching', zh: '调研中', id: 'Meneliti' },
+  statusApplying: { en: 'Applying', zh: '申请中', id: 'Mendaftar' },
+  statusSubmitted: { en: 'Submitted', zh: '已提交', id: 'Terkirim' },
+  statusAccepted: { en: 'Accepted', zh: '已录取', id: 'Diterima' },
+  statusRejected: { en: 'Rejected', zh: '被拒', id: 'Ditolak' },
+  statusWaitlisted: { en: 'Waitlisted', zh: '候补名单', id: 'Daftar Tunggu' },
+  daysLeft: { en: '{n} days left', zh: '还剩{n}天', id: '{n} hari lagi' },
+  daysOverdue: { en: '{n} days overdue', zh: '已逾期{n}天', id: 'Terlambat {n} hari' },
+  noDeadlineSet: { en: 'No deadline set', zh: '未设置截止日期', id: 'Belum ada tenggat waktu' },
+  updatedOn: { en: 'Updated {date}', zh: '更新于{date}', id: 'Diperbarui {date}' },
+
+  // Share
+  share: { en: 'Share', zh: '分享', id: 'Bagikan' },
+  copyLink: { en: 'Copy link', zh: '复制链接', id: 'Salin Tautan' },
+  shareCompare: { en: 'Share this comparison', zh: '分享此对比', id: 'Bagikan Perbandingan Ini' },
+  shareUniversity: { en: 'Share this university', zh: '分享此大学', id: 'Bagikan Universitas Ini' },
+  linkCopied: { en: 'Link copied to clipboard!', zh: '链接已复制到剪贴板！', id: 'Tautan disalin ke papan klip!' },
 };
 
 interface LanguageContextType {
@@ -548,6 +704,7 @@ interface LanguageContextType {
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
+  const { appName } = useBrand();
   const [lang, setLang] = useState<Lang>('en');
 
   useEffect(() => {
@@ -571,7 +728,8 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
         text = text.split(`{${k}}`).join(v);
       });
     }
-    return text;
+    // Inject the configured brand name so UI strings never hardcode it.
+    return subBrand(text, appName);
   };
 
   return (

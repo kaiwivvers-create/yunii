@@ -5,7 +5,9 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Navbar from '@/components/Navbar';
 import SurveyOverlay from '@/components/SurveyOverlay';
+import LegalModal from '@/components/LegalModal';
 import { loadUserData } from '@/utils/userStorage';
+import { isAdminRole } from '@/utils/roles';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 const universities = [
@@ -29,6 +31,7 @@ export default function Home() {
   const [showSurvey, setShowSurvey] = useState(false);
   const [isBlurred, setIsBlurred] = useState(false);
   const [searchInput, setSearchInput] = useState('');
+  const [legalModal, setLegalModal] = useState<'terms' | 'privacy' | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -44,11 +47,13 @@ export default function Home() {
     if (storedUser) {
       setUser(JSON.parse(storedUser));
       
-      // Check if survey needs to be shown (for non-admin users)
-      const surveyCompleted = loadUserData<string>('surveyCompleted', '');
+      // Check if survey needs to be shown (for non-admin users).
+      // Accept both 'true' (current format) and true (migrated legacy data).
+      const surveyCompleted = loadUserData<string | boolean>('surveyCompleted', '');
+      const surveyDone = surveyCompleted === 'true' || surveyCompleted === true;
       const parsedUser = JSON.parse(storedUser);
       
-      if (surveyCompleted !== 'true' && parsedUser.role !== 'admin') {
+      if (!surveyDone && !isAdminRole(parsedUser.role)) {
         // Show landing page first, then blur and show survey
         setTimeout(() => {
           setIsBlurred(true);
@@ -273,12 +278,25 @@ export default function Home() {
               <ul className="space-y-2 text-slate-800 text-sm">
                 <li><a href="#" className="hover:text-white transition-colors">{t('aboutUs')}</a></li>
                 <li><a href="#" className="hover:text-white transition-colors">{t('contact')}</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">{t('privacyPolicy')}</a></li>
+                <li>
+                  <button
+                    onClick={() => setLegalModal('privacy')}
+                    className="hover:text-white transition-colors cursor-pointer"
+                  >
+                    {t('privacyPolicy')}
+                  </button>
+                </li>
               </ul>
             </div>
           </div>
         </div>
       </footer>
+
+      <LegalModal
+        open={legalModal !== null}
+        type={legalModal ?? 'privacy'}
+        onClose={() => setLegalModal(null)}
+      />
     </div>
   );
 }

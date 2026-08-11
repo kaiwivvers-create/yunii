@@ -6,7 +6,7 @@ import Navbar from '../../components/Navbar';
 import LoginModal from '@/components/LoginModal';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { loadUserData, saveUserData } from '@/utils/userStorage';
-import { Plus, X, Search, Scale, Trophy, ThumbsUp, ThumbsDown, Calendar, Wallet } from 'lucide-react';
+import { Plus, X, Search, Scale, Trophy, ThumbsUp, ThumbsDown, Calendar, Wallet, Share2, CheckCircle2 } from 'lucide-react';
 
 const slugify = (name: string) => name.toLowerCase().replace(/\s+/g, '-');
 
@@ -18,6 +18,7 @@ export default function ComparePage() {
   const [compareList, setCompareList] = useState<number[]>([]);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     const checkLogin = () => setIsLoggedIn(!!localStorage.getItem('user'));
@@ -70,6 +71,18 @@ export default function ComparePage() {
     }
     setCompareList(next);
     saveUserData('compareList', next);
+  };
+
+  const copyShareLink = async () => {
+    if (compareList.length === 0) return;
+    const url = `${window.location.origin}/compare?ids=${compareList.join(',')}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* ignore */
+    }
   };
 
   const filtered = allUniversities.filter((u) => {
@@ -153,7 +166,21 @@ export default function ComparePage() {
               {t('compare')}
             </div>
             <h1 className="text-4xl font-bold text-slate-900 mb-2">{t('compareTitle')}</h1>
-            <p className="text-slate-600">{t('compareSubtitle')}</p>
+            <div className="flex flex-wrap items-center gap-3">
+              <p className="text-slate-600">{t('compareSubtitle')}</p>
+              <button
+                onClick={copyShareLink}
+                disabled={compareList.length === 0}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+                  copied
+                    ? 'bg-emerald-500/10 text-emerald-600'
+                    : 'bg-[#9370DB]/10 text-[#9370DB] hover:bg-[#9370DB]/20'
+                }`}
+              >
+                {copied ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Share2 className="w-3.5 h-3.5" />}
+                {copied ? t('linkCopied') : t('copyLink')}
+              </button>
+            </div>
           </div>
 
           <div className="flex flex-col lg:flex-row gap-6 items-start lg:items-stretch lg:flex-1 lg:min-h-0">
@@ -214,7 +241,8 @@ export default function ComparePage() {
                   <p className="text-slate-500">{t('emptyCompare')}</p>
                 </div>
               ) : (
-                <div className="bg-white rounded-2xl border border-[#E2E0F0] overflow-hidden shadow-sm">
+                <div className="bg-white rounded-2xl border border-[#E2E0F0] shadow-sm overflow-x-auto">
+                  <div className="min-w-[560px]">
                   {/* Header row — university cards */}
                   <div className="grid" style={{ gridTemplateColumns: `180px repeat(${selected.length}, minmax(0, 1fr))` }}>
                     <div className="p-4" />
@@ -301,6 +329,7 @@ export default function ComparePage() {
                         {(!u.cons || u.cons.length === 0) && <p className="text-sm text-slate-400">—</p>}
                       </div>
                     ))}
+                  </div>
                   </div>
                 </div>
               )}

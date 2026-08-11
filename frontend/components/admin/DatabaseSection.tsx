@@ -1,8 +1,9 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import ConfirmModal from '../ConfirmModal';
-import { Database, Download, Upload, FileJson, CheckCircle2, XCircle } from 'lucide-react';
+import { Database, Download, Upload, FileJson, CheckCircle2, XCircle, RotateCcw } from 'lucide-react';
+import { isSuperAdmin } from '@/utils/roles';
 
 const cardCls =
   'bg-white dark:bg-dark-bg-secondary border border-[#E2E0F0] dark:border-dark-border rounded-xl shadow-sm';
@@ -14,21 +15,56 @@ const csvEscape = (v: any) => {
   return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 };
 
+// Every table in the database, with its columns. Used by both the CSV and SQL
+// exporters so a backup covers the full schema (JSON export already does).
+const TABLE_COLUMNS: Record<string, string[]> = {
+  universities: ['id', 'name', 'location', 'province', 'region', 'description', 'image', 'details', 'rankings', 'pros', 'cons', 'scholarships', 'applicationDeadlines', 'costOfLiving', 'visa', 'createdBy', 'updatedBy', 'createdAt', 'updatedAt'],
+  regions: ['name'],
+  users: ['id', 'name', 'email', 'role', 'permissions', 'emailVerified', 'profilePicture', 'createdAt', 'updatedAt'],
+  roles: ['id', 'name', 'permissions', 'isSystem'],
+  settings: ['id', 'appName', 'appIcon', 'address', 'managerName', 'contactEmail', 'contactPhone'],
+  activityLog: ['id', 'action', 'entity', 'entityId', 'entityName', 'actor', 'meta', 'timestamp'],
+  versions: ['id', 'universityId', 'version', 'snapshot', 'actor', 'summary', 'timestamp'],
+  trash: ['id', 'type', 'item', 'deletedBy', 'deletedAt'],
+  bookmarks: ['id', 'universityId', 'universityName', 'region', 'action', 'userEmail', 'timestamp'],
+  reviews: ['id', 'universityId', 'universityName', 'userEmail', 'userName', 'rating', 'comment', 'createdAt'],
+  applications: ['id', 'userEmail', 'universityId', 'universityName', 'status', 'notes', 'createdAt', 'updatedAt'],
+  userPreferences: ['id', 'userEmail', 'intendedMajor', 'degreeLevel', 'preferredRegions', 'preferredCountries', 'budget', 'gpa', 'languageRequirements', 'extracurriculars', 'studyMode', 'startDate', 'surveyCompleted', 'updatedAt'],
+  academicScores: ['id', 'userEmail', 'name', 'score', 'scale', 'status', 'updatedAt'],
+  recommendations: ['id', 'userEmail', 'source', 'query', 'response', 'results', 'createdAt'],
+  programs: ['id', 'universityId', 'name', 'degreeLevel', 'description', 'updatedAt'],
+  requirements: ['id', 'universityId', 'category', 'name', 'updatedAt'],
+  scholarships: ['id', 'universityId', 'name', 'amount', 'eligibility', 'deadline', 'updatedAt'],
+};
+
+/** Rows for a table from the export payload (regions/versions/settings have odd shapes). */
+const tableRows = (data: any, table: string): any[] => {
+  if (table === 'regions') return (data.regions || []).map((r: string) => ({ name: r }));
+  if (table === 'versions') return Object.values(data.versions || {}).flat();
+  if (table === 'settings') return data.settings ? [data.settings] : [];
+  return data[table] || [];
+};
+
+const cell = (r: any, c: string): any => {
+  const v = r?.[c];
+  if (v !== null && v !== undefined && typeof v === 'object') return JSON.stringify(v);
+  return v;
+};
+
 function buildCsv(data: any): string {
   const lines: string[] = [];
   const addTable = (title: string, rows: any[], cols: string[]) => {
-    if (rows.length === 0) return;
+    // Always print the header so every table is represented, even when empty
     lines.push(`=== ${title} ===`);
     lines.push(cols.map(csvEscape).join(','));
     rows.forEach((r) => {
-      lines.push(cols.map((c) => csvEscape(r[c])).join(','));
+      lines.push(cols.map((c) => csvEscape(cell(r, c))).join(','));
     });
     lines.push('');
   };
-  addTable('universities', data.universities, ['id', 'name', 'location', 'province', 'region', 'description']);
-  addTable('regions', data.regions.map((r: string) => ({ region: r })), ['region']);
-  addTable('users', data.users, ['id', 'name', 'email', 'role', 'createdAt']);
-  addTable('bookmarks', data.bookmarks, ['universityName', 'region', 'action', 'userEmail', 'timestamp']);
+  Object.entries(TABLE_COLUMNS).forEach(([table, cols]) => {
+    addTable(table, tableRows(data, table), cols);
+  });
   return lines.join('\n');
 }
 
@@ -37,30 +73,36 @@ const sqlEscape = (v: any) => {
   return `'${String(v).replace(/'/g, "''")}'`;
 };
 
-function buildSql(data: any): string {
+const sqlType = (col: string) => {
+  if (col === 'id') return 'INTEGER PRIMARY KEY';
+  if (col === 'universityId' || col === 'version' || col === 'rating') return 'INTEGER';
+  if (col === 'emailVerified' || col === 'isSystem' || col === 'surveyCompleted') return 'BOOLEAN';
+  return 'TEXT';
+};
+
+function buildSql(data: any, appName: string): string {
   const out: string[] = [];
-  out.push(`-- UniVerse database export — ${new Date().toISOString()}`);
+  out.push(`-- ${appName} database export — ${new Date().toISOString()}`);
+  out.push('-- Full backup: every table, CREATE TABLE + INSERT (MySQL/Postgres/SQLite-style)');
   out.push('');
-  out.push('CREATE TABLE IF NOT EXISTS universities (id INTEGER PRIMARY KEY, name TEXT, location TEXT, province TEXT, region TEXT, description TEXT, image TEXT);');
-  data.universities.forEach((u: any) => {
-    out.push(
-      `INSERT INTO universities (id, name, location, province, region, description, image) VALUES (${u.id}, ${sqlEscape(u.name)}, ${sqlEscape(u.location)}, ${sqlEscape(u.province)}, ${sqlEscape(u.region)}, ${sqlEscape(u.description)}, ${sqlEscape(u.image || '')});`
-    );
-  });
-  out.push('');
-  out.push('CREATE TABLE IF NOT EXISTS regions (name TEXT PRIMARY KEY);');
-  data.regions.forEach((r: string) => {
-    out.push(`INSERT INTO regions (name) VALUES (${sqlEscape(r)});`);
-  });
-  out.push('');
-  out.push('CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, name TEXT, email TEXT, role TEXT, created_at TEXT);');
-  data.users.forEach((u: any) => {
-    out.push(`INSERT INTO users (id, name, email, role, created_at) VALUES (${u.id}, ${sqlEscape(u.name)}, ${sqlEscape(u.email)}, ${sqlEscape(u.role)}, ${sqlEscape(u.createdAt)});`);
-  });
-  out.push('');
-  out.push('CREATE TABLE IF NOT EXISTS bookmarks (id INTEGER PRIMARY KEY, university_name TEXT, region TEXT, action TEXT, user_email TEXT, timestamp TEXT);');
-  data.bookmarks.forEach((b: any) => {
-    out.push(`INSERT INTO bookmarks (id, university_name, region, action, user_email, timestamp) VALUES (${b.id}, ${sqlEscape(b.universityName)}, ${sqlEscape(b.region)}, ${sqlEscape(b.action)}, ${sqlEscape(b.userEmail || '')}, ${sqlEscape(b.timestamp)});`);
+
+  Object.entries(TABLE_COLUMNS).forEach(([table, cols]) => {
+    const create =
+      table === 'regions'
+        ? 'CREATE TABLE IF NOT EXISTS regions (name TEXT PRIMARY KEY);'
+        : `CREATE TABLE IF NOT EXISTS ${table} (${cols
+            .map((c) => `${c} ${sqlType(c)}`)
+            .join(', ')});`;
+    out.push(create);
+    tableRows(data, table).forEach((r: any) => {
+      const values = cols.map((c) => {
+        const v = cell(r, c);
+        // Store booleans as 1/0 so the dump works in SQLite, MySQL and Postgres
+        return sqlEscape(typeof v === 'boolean' ? (v ? '1' : '0') : v);
+      });
+      out.push(`INSERT INTO ${table} (${cols.join(', ')}) VALUES (${values.join(', ')});`);
+    });
+    out.push('');
   });
   return out.join('\n');
 }
@@ -70,7 +112,42 @@ export default function DatabaseSection({ onDataChange }: { onDataChange?: () =>
   const [format, setFormat] = useState<ExportFormat>('json');
   const [importing, setImporting] = useState(false);
   const [confirmImport, setConfirmImport] = useState<null | { json: any; fileName: string }>(null);
+  const [confirmReset, setConfirmReset] = useState(false);
+  const [resetting, setResetting] = useState(false);
   const [result, setResult] = useState<null | { ok: boolean; message: string }>(null);
+  const [user, setUser] = useState<any>(null);
+
+  useEffect(() => {
+    const stored = localStorage.getItem('user');
+    setUser(stored ? JSON.parse(stored) : null);
+  }, []);
+
+  const handleReset = async () => {
+    setResetting(true);
+    try {
+      const res = await fetch('/api/admin/reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ actor: user?.name || 'admin', actorRole: user?.role || '' }),
+      });
+      if (res.ok) {
+        const d = await res.json();
+        setResult({
+          ok: true,
+          message: `Database reset to seed data (${d.totals?.universities ?? '?'} universities, ${d.totals?.users ?? '?'} users).`,
+        });
+        onDataChange?.();
+      } else {
+        setResult({ ok: false, message: 'Reset failed — only Super Admins can reset the database.' });
+      }
+    } catch (err) {
+      console.error(err);
+      setResult({ ok: false, message: 'Reset failed.' });
+    } finally {
+      setResetting(false);
+      setConfirmReset(false);
+    }
+  };
 
   const handleExport = async () => {
     try {
@@ -78,6 +155,7 @@ export default function DatabaseSection({ onDataChange }: { onDataChange?: () =>
       if (!res.ok) throw new Error('Export failed');
       const data = await res.json();
       const full = data.data;
+      const appName = data.app || 'UniVerse';
       const date = new Date().toISOString().slice(0, 10);
       let content = '';
       let ext = 'json';
@@ -88,7 +166,7 @@ export default function DatabaseSection({ onDataChange }: { onDataChange?: () =>
         content = buildCsv(full);
         ext = 'csv';
       } else {
-        content = buildSql(full);
+        content = buildSql(full, appName);
         ext = 'sql';
       }
       const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
@@ -129,7 +207,11 @@ export default function DatabaseSection({ onDataChange }: { onDataChange?: () =>
       const res = await fetch('/api/admin/import', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(confirmImport.json),
+        body: JSON.stringify({
+          ...confirmImport.json,
+          actor: user?.name || 'admin',
+          actorRole: user?.role || '',
+        }),
       });
       if (res.ok) {
         const d = await res.json();
@@ -195,9 +277,9 @@ export default function DatabaseSection({ onDataChange }: { onDataChange?: () =>
           </div>
 
           <p className="text-xs text-slate-500 dark:text-dark-text-secondary mb-5">
-            {format === 'json' && 'Full backup — universities, regions, users, roles, settings, versions, activity & bookmarks. Use this for import.'}
-            {format === 'csv' && 'Universities, regions, users, and bookmarks as spreadsheets (one section per table).'}
-            {format === 'sql' && 'Portable SQL with CREATE TABLE + INSERT statements for MySQL/Postgres/SQLite-style databases.'}
+            {format === 'json' && 'Full backup of every table — users, universities, programs, requirements, scholarships, preferences, recommendations, activity, versions & more. Use this for import.'}
+            {format === 'csv' && `Every table as spreadsheets — one section per table (${Object.keys(TABLE_COLUMNS).length} total).`}
+            {format === 'sql' && `Portable SQL with CREATE TABLE + INSERT statements for every table (${Object.keys(TABLE_COLUMNS).length} total).`}
           </p>
 
           <button
@@ -236,13 +318,40 @@ export default function DatabaseSection({ onDataChange }: { onDataChange?: () =>
             Choose Backup File
           </button>
         </div>
-      </div>
+      </div>        {/* Reset to seed data (Super Admin only) */}
+        {isSuperAdmin(user?.role) && (
+          <div className={`${cardCls} p-6 border border-red-200 dark:border-red-500/30`}>
+            <div className="flex items-center justify-between flex-wrap gap-4">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900 dark:text-dark-text flex items-center gap-2">
+                  <RotateCcw className="w-5 h-5 text-red-500" />
+                  Reset database
+                </h3>
+                <p className="text-sm text-slate-500 dark:text-dark-text-secondary mt-1.5 max-w-xl">
+                  Wipe all data and restore the original seed content (universities, regions, roles
+                  and the demo admin). Only Super Admins can do this — export a backup first if you
+                  need one.
+                </p>
+              </div>
+              <button
+                onClick={() => setConfirmReset(true)}
+                disabled={resetting}
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-red-500 text-white rounded-lg font-medium hover:bg-red-600 transition-colors shadow-sm shadow-red-500/30 disabled:opacity-60"
+              >
+                <RotateCcw className="w-4 h-4" />
+                {resetting ? 'Resetting…' : 'Reset to seed data'}
+              </button>
+            </div>
+          </div>
+        )}
 
-      {/* Storage note */}
-      <div className={`${cardCls} p-5 text-sm text-slate-600 dark:text-dark-text-secondary`}>
+        {/* Storage note */}
+        <div className={`${cardCls} p-5 text-sm text-slate-600 dark:text-dark-text-secondary`}>
         <p className="font-medium text-slate-800 dark:text-dark-text mb-1">Where is the data stored?</p>
         <p>
-          Currently in <code className="px-1.5 py-0.5 bg-[#F4F2FA] dark:bg-dark-bg-tertiary rounded text-[#9370DB]">backend/data/db.json</code> on your machine — it survives restarts and is git-ignored. This is the file your exports back up and imports replace.
+          In a real database — MySQL, PostgreSQL, or SQLite (fallback) — configured via{" "}
+          <code className="px-1.5 py-0.5 bg-[#F4F2FA] dark:bg-dark-bg-tertiary rounded text-[#9370DB]">backend/.env</code>.
+          This is the data your exports back up and imports replace.
         </p>
       </div>
 
@@ -266,6 +375,16 @@ export default function DatabaseSection({ onDataChange }: { onDataChange?: () =>
         danger
         onConfirm={doImport}
         onCancel={() => setConfirmImport(null)}
+      />
+
+      <ConfirmModal
+        open={confirmReset}
+        title="Reset database?"
+        message="All current data will be wiped and replaced with the original seed data. This cannot be undone — export a backup first if you need one."
+        confirmLabel="Reset database"
+        danger
+        onConfirm={handleReset}
+        onCancel={() => setConfirmReset(false)}
       />
       {importing && (
         <div className="text-center py-8 text-slate-500 dark:text-dark-text-secondary">Importing…</div>

@@ -7,8 +7,10 @@ import LoginModal from '@/components/LoginModal';
 import GuideEditor from '@/components/GuideEditor';
 import { guides } from '../../data/guides';
 import type { Guide } from '../../data/guides';
+import { localizeGuide } from '../../data/guideTranslations';
 import { loadGuides } from '../../utils/guidesStore';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { isAdminRole } from '@/utils/roles';
 import { BookOpen, Clock, ArrowRight, Plus, Pencil } from 'lucide-react';
 
 const categoryKeys: Record<string, string> = {
@@ -36,7 +38,7 @@ export default function GuidesPage() {
       setIsLoggedIn(!!storedUser);
       if (storedUser) {
         try {
-          setIsAdmin(JSON.parse(storedUser).role === 'admin');
+          setIsAdmin(isAdminRole(JSON.parse(storedUser).role));
         } catch {
           setIsAdmin(false);
         }
@@ -161,10 +163,10 @@ export default function GuidesPage() {
                     {guide.readTime} {t('readTime')}
                   </div>
                   <h2 className="font-bold text-slate-900 mb-2 group-hover:text-[#9370DB] transition-colors">
-                    {lang === 'zh' ? guide.titleZh : guide.title}
+                    {localizeGuide(guide, lang).title}
                   </h2>
                   <p className="text-sm text-slate-600 leading-relaxed mb-4">
-                    {lang === 'zh' ? guide.excerptZh : guide.excerpt}
+                    {localizeGuide(guide, lang).excerpt}
                   </p>
                   <span className="inline-flex items-center gap-1.5 text-sm font-medium text-[#9370DB]">
                     {t('readMore')}
