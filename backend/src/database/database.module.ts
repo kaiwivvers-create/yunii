@@ -118,10 +118,12 @@ export class SeedService implements OnApplicationBootstrap {
         const urlType =
           (fromUrl && /^postgres(ql)?:/i.test(fromUrl.scheme) ? 'postgres' : '') ||
           (fromUrl && /^mysql:/i.test(fromUrl.scheme) ? 'mysql' : '');
-        // A URL is explicit intent: it wins over the placeholder 'sqlite' default,
-        // but an explicit non-sqlite DB_TYPE still takes precedence.
+        // A URL is explicit intent: it wins over the placeholder 'postgres'
+        // default, but an explicit non-sqlite DB_TYPE still takes precedence.
+        // Nothing configured -> PostgreSQL (matches backend/docker-compose.yml);
+        // set DB_TYPE=sqlite to fall back to the local file database.
         const type =
-          (explicitType && explicitType !== 'sqlite' ? explicitType : '') || urlType || explicitType || 'sqlite';
+          (explicitType && explicitType !== 'sqlite' ? explicitType : '') || urlType || explicitType || 'postgres';
         const common = {
           autoLoadEntities: true,
           synchronize: config.get('DB_SYNCHRONIZE', 'true') !== 'false',
@@ -151,7 +153,8 @@ export class SeedService implements OnApplicationBootstrap {
             host: fromUrl?.host || config.get('DB_HOST', 'localhost'),
             port: fromUrl?.port || parseInt(config.get('DB_PORT', '5432'), 10),
             username: fromUrl?.username || config.get('DB_USER', 'postgres'),
-            password: fromUrl?.password ?? config.get('DB_PASSWORD', ''),
+            // Default password matches backend/docker-compose.yml
+            password: fromUrl?.password ?? config.get('DB_PASSWORD', 'postgres'),
             database: fromUrl?.database || config.get('DB_NAME', 'universe'),
             ssl,
             ...common,

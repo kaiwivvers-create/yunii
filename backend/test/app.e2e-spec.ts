@@ -4,6 +4,11 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
 
+// Tests must run without a database server: pin the DB module to the local
+// SQLite file database instead of the default PostgreSQL.
+process.env.DB_TYPE = 'sqlite';
+process.env.DB_FILE = 'data/test-universe.sqlite';
+
 describe('AppController (e2e)', () => {
   let app: INestApplication<App>;
 

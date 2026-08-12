@@ -31,6 +31,26 @@
 $ npm install
 ```
 
+## PostgreSQL (default database)
+
+The backend defaults to PostgreSQL. To run one locally:
+
+```bash
+$ docker compose up -d        # starts Postgres on localhost:5432
+$ cp .env.example .env        # connection settings (matches docker-compose.yml)
+$ npm run start:dev
+```
+
+Tables are created automatically on boot (seed data is inserted on first run).
+Configuration is read from `DATABASE_URL` when set, otherwise from the `DB_*`
+variables (see `.env.example`).
+
+- **Managed Postgres (Neon, Supabase, Railway, RDS...):** paste the provider's
+  connection URL into `DATABASE_URL` (e.g. `postgres://user:pass@host:5432/db?sslmode=require`).
+- **Local file database instead:** set `DB_TYPE=sqlite` (optionally `DB_FILE=data/universe.sqlite`).
+- **Manual schema management:** set `DB_SYNCHRONIZE=false` and apply `schema.sql`:
+  `psql "$DATABASE_URL" -f schema.sql`.
+
 ## Compile and run the project
 
 ```bash

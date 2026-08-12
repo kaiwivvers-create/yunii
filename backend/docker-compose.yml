@@ -1,0 +1,29 @@
+# Local PostgreSQL for the UniVerse backend.
+#
+#   docker compose up -d
+#   cp .env.example .env
+#   npm run start:dev
+#
+# The backend's defaults (user postgres / password postgres / db universe /
+# port 5432) match this file, so it works with zero extra config.
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: universe-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: universe
+    ports:
+      - '5432:5432'
+    volumes:
+      - universe_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d universe']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  universe_pgdata:
