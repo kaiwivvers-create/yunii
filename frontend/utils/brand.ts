@@ -18,7 +18,7 @@ export interface BrandSettings {
   appIcon: string;
 }
 
-const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:7777';
+const BACKEND_URL = process.env.BACKEND_URL || 'http://98.142.245.188:7777';
 
 // Small server-side cache so metadata/AI routes don't hit the backend on
 // every request (the client BrandProvider always fetches fresh).

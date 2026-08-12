@@ -35,7 +35,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const title = `${appName} - Discover Universities Worldwide`;
 
   return {
-    metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"),
+    metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://tweekerasity.vercel.app"),
     title: {
       default: title,
       template: `%s | ${appName}`,

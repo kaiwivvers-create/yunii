@@ -1,8 +1,8 @@
 import type { NextConfig } from "next";
 
-// Backend base URL for the /api rewrites. Override with BACKEND_URL when the
-// backend is hosted separately (e.g. http://<server-ip>:7777).
-const backendUrl = process.env.BACKEND_URL || 'http://localhost:7777';
+// Backend base URL for the /api rewrites. Override with BACKEND_URL if the
+// backend ever moves; defaults to the production server.
+const backendUrl = process.env.BACKEND_URL || 'http://98.142.245.188:7777';
 
 const nextConfig: NextConfig = {
   async rewrites() {

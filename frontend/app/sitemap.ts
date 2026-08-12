@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 
-const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://tweekerasity.vercel.app";
 
 const slugify = (name: string) => name.toLowerCase().replace(/\s+/g, "-");
 
@@ -18,7 +18,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // Live university pages — fetched from the backend at request time.
   let universityRoutes: MetadataRoute.Sitemap = [];
   try {
-    const res = await fetch(`${process.env.BACKEND_URL || "http://localhost:7777"}/admin/universities`, {
+    const res = await fetch(`${process.env.BACKEND_URL || "http://98.142.245.188:7777"}/admin/universities`, {
       cache: "no-store",
     });
     if (res.ok) {
